@@ -357,7 +357,7 @@ async function fetchSingleAccount(account) {
     const lock = await client.getMailboxLock('INBOX');
     try {
       let i = 0;
-      for await (const msg of client.fetch('ALL', { envelope: true, source: true, flags: true })) {
+      for await (const msg of client.fetch('UNSEEN', { envelope: true, source: true, flags: true })) {
         if (++i > 20) break;
         let parsed = null;
         try { parsed = await simpleParser(msg.source); } catch {}
@@ -385,9 +385,11 @@ async function fetchSingleAccount(account) {
     } finally { lock.release(); }
     if (client) await client.logout();
   } catch (err) {
-    console.error(`IMAP error for ${account.label}:`, err.message);
+    const msg = err?.message || 'Unknown error';
+    const stack = (err?.stack || '').substring(0, 300);
+    console.error(`IMAP error for ${account.label}: ${msg}`);
     if (client) try { await client.logout(); } catch {}
-    return { count: 0, emails: [], error: err.message };
+    return { count: 0, emails: [], error: msg, debug: stack };
   }
   return { count, emails };
 }
