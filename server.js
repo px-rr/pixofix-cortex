@@ -376,52 +376,57 @@ function fetchSingleAccount(account) {
 
 function fetchMessages(imap, uids, emails, count, resolve, account) {
   const f = imap.fetch(uids, { bodies: '', markSeen: false });
-  let buffer = '';
-  let currentMsg = null;
-  const savePromises = [];
+  const msgData = [];
   f.on('message', (msg) => {
-    buffer = '';
-    msg.on('body', (stream) => {
-      stream.on('data', (chunk) => { buffer += chunk.toString('utf8'); });
-    });
-    msg.once('attributes', (attrs) => {
-      currentMsg = { uid: attrs.uid, flags: attrs.flags || [] };
-    });
-    msg.once('end', async () => {
-      if (!buffer) return;
-      try {
-        const parsed = await simpleParser(buffer);
-        const fromRaw = parsed.from?.text || parsed.from?.value?.[0]?.address || 'Unknown';
-        const subject = parsed.subject || '(No subject)';
-        const bodyText = parsed.text || '';
-        const date = parsed.date?.toISOString() || new Date().toISOString();
-        count++;
-        emails.push({ id: currentMsg?.uid || count, subject, from: fromRaw, to: parsed.to?.text || '', date, text: bodyText.substring(0, 5000), seen: currentMsg?.flags?.includes('\\Seen') || false, account: account.label });
-        const p = (async () => {
-          const data = await db();
-          if ((data.emailLogs || []).some(e => e.subject === subject && e.fromAddr === fromRaw)) return;
-          if (!data.emailLogs) data.emailLogs = [];
-          const logId = uuidv4();
-          const now = new Date().toISOString();
-          const maskedFrom = maskEmail(fromRaw);
-          data.emailLogs.push({ id: logId, fromAddr: fromRaw, fromMasked: maskedFrom, subject, body: bodyText.substring(0, 2000), receivedAt: now, processedAs: '', account: account.label });
-          const ticketId = 'T' + await nextId('ticket');
-          if (!data.tickets) data.tickets = [];
-          data.tickets.push({ id: ticketId, subject, client: maskedFrom, status: 'Open', priority: 'Medium', description: bodyText.substring(0, 2000), category: 'Email', agent: '', createdBy: 'system', createdAt: now, updatedAt: now, rtc: '', summary: '' });
-          const log = data.emailLogs.find(e => e.id === logId);
-          if (log) log.processedAs = ticketId;
-          await dbSave(data);
-        })();
-        p.catch(() => {});
-        savePromises.push(p);
-      } catch (e) {}
-    });
+    let buffer = '';
+    let attrs = null;
+    msg.on('body', (stream) => { stream.on('data', (chunk) => { buffer += chunk.toString('utf8'); }); });
+    msg.once('attributes', (a) => { attrs = a; });
+    msg.once('end', () => { msgData.push({ buffer, uid: attrs?.uid, flags: attrs?.flags || [] }); });
   });
   f.once('error', (err) => { imap.end(); resolve({ count: 0, emails: [], error: err.message }); });
-  f.once('end', async () => {
-    await Promise.all(savePromises);
-    imap.end();
-    resolve({ count, emails });
+  f.once('end', () => {
+    (async () => {
+      for (const md of msgData) {
+        if (!md.buffer) continue;
+        try {
+          const parsed = await simpleParser(md.buffer);
+          const fromRaw = parsed.from?.text || parsed.from?.value?.[0]?.address || 'Unknown';
+          const subject = parsed.subject || '(No subject)';
+          const bodyText = parsed.text || '';
+          const date = parsed.date?.toISOString() || new Date().toISOString();
+          count++;
+          emails.push({ id: md.uid || count, subject, from: fromRaw, to: parsed.to?.text || '', date, text: bodyText.substring(0, 5000), seen: md.flags.includes('\\Seen') || false, account: account.label });
+          try {
+            const raw = fs.existsSync(DB_FILE) ? fs.readFileSync(DB_FILE, 'utf-8') : null;
+            let data = raw ? JSON.parse(raw) : createFreshDB();
+            if (!(data.emailLogs || []).some(e => e.subject === subject && e.fromAddr === fromRaw)) {
+              if (!data.emailLogs) data.emailLogs = [];
+              const logId = uuidv4();
+              const now = new Date().toISOString();
+              const maskedFrom = maskEmail(fromRaw);
+              data.emailLogs.push({ id: logId, fromAddr: fromRaw, fromMasked: maskedFrom, subject, body: bodyText.substring(0, 2000), receivedAt: now, processedAs: '', account: account.label });
+              data.nextId = data.nextId || {};
+              const n = (data.nextId.ticket || 100) + 1;
+              data.nextId.ticket = n;
+              const ticketId = 'T' + n;
+              if (!data.tickets) data.tickets = [];
+              data.tickets.push({ id: ticketId, subject, client: maskedFrom, status: 'Open', priority: 'Medium', description: bodyText.substring(0, 2000), category: 'Email', agent: '', createdBy: 'system', createdAt: now, updatedAt: now, rtc: '', summary: '' });
+              const log = data.emailLogs.find(e => e.id === logId);
+              if (log) log.processedAs = ticketId;
+              fs.mkdirSync(DATA_DIR, { recursive: true });
+              fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
+            }
+          } catch (e) {}
+        } catch (e) {}
+      }
+      imap.end();
+      resolve({ count, emails });
+    })();
+  });
+}
+      } catch (e) {}
+    });
   });
 }
 
