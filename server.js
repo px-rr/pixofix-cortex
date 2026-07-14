@@ -459,6 +459,11 @@ app.use((req, res, next) => {
   next();
 });
 
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  res.status(500).json({ error: err.message, stack: process.env.VERCEL ? undefined : err.stack });
+});
+
 if (!IS_VERCEL) {
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Pixofix Cortex server running on port ${PORT}`);
