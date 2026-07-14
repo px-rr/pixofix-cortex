@@ -355,7 +355,10 @@ async function fetchSingleAccount(account) {
     await client.connect();
     const lock = await client.getMailboxLock('INBOX');
     try {
-      for await (const msg of client.fetch('1:*', { envelope: true, source: true, flags: true })) {
+      const date7d = new Date(Date.now() - 7*86400000).toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'numeric'}).replace(/ /g,'-');
+      let msgCount = 0;
+      for await (const msg of client.fetch(`SINCE ${date7d}`, { envelope: true, source: true, flags: true })) {
+          if (++msgCount > 20) break;
           let parsed = null;
           try { parsed = await simpleParser(msg.source); } catch {}
           const fromRaw = parsed?.from?.text || msg.envelope?.from?.[0]?.address || 'Unknown';
