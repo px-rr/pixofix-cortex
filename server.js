@@ -425,10 +425,6 @@ function fetchMessages(imap, uids, emails, count, resolve, account) {
     })();
   });
 }
-      } catch (e) {}
-    });
-  });
-}
 
 async function pollAllAccounts() {
   if (pollingActive) return;
