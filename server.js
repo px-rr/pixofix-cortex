@@ -355,9 +355,7 @@ async function fetchSingleAccount(account) {
     await client.connect();
     const lock = await client.getMailboxLock('INBOX');
     try {
-      const allUids = await client.search('ALL');
-      for (const uid of allUids.slice(-20)) {
-        for await (const msg of client.fetch(uid, { envelope: true, source: true, flags: true })) {
+      for await (const msg of client.fetch('1:*', { envelope: true, source: true, flags: true })) {
           let parsed = null;
           try { parsed = await simpleParser(msg.source); } catch {}
           const fromRaw = parsed?.from?.text || msg.envelope?.from?.[0]?.address || 'Unknown';
