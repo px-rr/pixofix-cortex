@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "Pixofix Cortex — Operations Platform",
   "dependencies": {
-    "@vercel/kv": "^3.0.0",
     "cors": "^2.8.6",
     "express": "^5.2.1",
     "imapflow": "^1.4.7",
