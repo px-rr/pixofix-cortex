@@ -1,0 +1,6 @@
+{
+  "version": 2,
+  "buildCommand": null,
+  "installCommand": "npm install imapflow mailparser",
+  "framework": null
+}

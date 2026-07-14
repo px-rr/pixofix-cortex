@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pixofix — Operations Platform</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Orbitron:wght@600;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --pf-bg: #0a0a0a; --pf-bg-header: #111113; --pf-bg-sidebar: #0d0d0f; --pf-bg-surface: #151517;
+  --pf-bg-hover: #1f1f23; --pf-bg-code: #1a1a1e; --pf-bg-input: #1a1a1e; --pf-bg-conv-alt: #121214;
+  --pf-text: #f4f4f5; --pf-text-secondary: #a1a1aa; --pf-text-muted: #52525b;
+  --pf-border: #27272a; --pf-border-light: #1f1f23;
+  --pf-primary: #7c3aed; --pf-primary-hover: #6d28d9; --pf-primary-light: rgba(124,58,237,0.12);
+  --pf-success: #22c55e; --pf-success-bg: rgba(34,197,94,0.1);
+  --pf-warning: #f59e0b; --pf-warning-bg: rgba(245,158,11,0.1);
+  --pf-danger: #ef4444; --pf-danger-bg: rgba(239,68,68,0.1);
+  --pf-info: #3b82f6; --pf-info-bg: rgba(59,130,246,0.1);
+  --pf-header-h: 54px; --pf-sidebar-w: 240px;
+  --pf-radius: 6px; --pf-radius-sm: 4px; --pf-radius-lg: 8px;
+  --pf-font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --pf-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+}
+[data-theme="light"] {
+  --pf-bg: #f4f4f5; --pf-bg-header: #ffffff; --pf-bg-sidebar: #fafafa; --pf-bg-surface: #ffffff;
+  --pf-bg-hover: #f0f0f2; --pf-bg-code: #f0f0f2; --pf-bg-input: #ffffff; --pf-bg-conv-alt: #fafafa;
+  --pf-text: #18181b; --pf-text-secondary: #52525b; --pf-text-muted: #a1a1aa;
+  --pf-border: #e4e4e7; --pf-border-light: #f0f0f2;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{font-family:var(--pf-font);background:var(--pf-bg);color:var(--pf-text);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;position:relative}
+body::before{content:'';position:fixed;inset:0;z-index:0;background:radial-gradient(ellipse 80% 60% at 0% 20%,rgba(124,58,237,0.08) 0%,transparent 60%),radial-gradient(ellipse 60% 50% at 100% 80%,rgba(59,130,246,0.06) 0%,transparent 50%),radial-gradient(ellipse 50% 40% at 50% 100%,rgba(124,58,237,0.04) 0%,transparent 50%);pointer-events:none}
+.hidden{display:none!important}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--pf-border);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--pf-text-muted)}
+@keyframes neonPulse{0%,100%{box-shadow:0 0 4px var(--pf-primary),0 0 8px color-mix(in srgb,var(--pf-primary) 60%,transparent)}50%{box-shadow:0 0 8px var(--pf-primary),0 0 20px color-mix(in srgb,var(--pf-primary) 50%,transparent),0 0 40px color-mix(in srgb,var(--pf-primary) 30%,transparent)}}
+@keyframes borderGlow{0%,100%{border-color:var(--pf-border)}50%{border-color:color-mix(in srgb,var(--pf-primary) 40%,var(--pf-border))}}
+@keyframes neonPulseDanger{0%,100%{box-shadow:0 0 4px var(--pf-danger),0 0 8px color-mix(in srgb,var(--pf-danger) 60%,transparent)}50%{box-shadow:0 0 8px var(--pf-danger),0 0 20px color-mix(in srgb,var(--pf-danger) 50%,transparent),0 0 40px color-mix(in srgb,var(--pf-danger) 30%,transparent)}}
+.c-glow{animation:neonPulse 3s ease-in-out infinite}
+.c-glow-danger{animation:neonPulseDanger 3s ease-in-out infinite}
+.c-glow-border{animation:borderGlow 4s ease-in-out infinite}
+code{font-family:var(--pf-mono);font-size:.875em}
+#loginScreen{height:100vh;display:flex;align-items:center;justify-content:center;z-index:10;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%)}
+.main-container{perspective:1000px;z-index:20}
+#flip-toggle{display:none}
+.flip-card{width:380px;height:420px;position:relative}
+.flip-card-inner{position:relative;width:100%;height:100%;text-align:center;transition:transform .8s cubic-bezier(.175,.885,.32,1.275);transform-style:preserve-3d}
+#flip-toggle:checked+.flip-card .flip-card-inner{transform:rotateY(180deg)}
+.flip-front,.flip-back{position:absolute;width:100%;height:100%;backface-visibility:hidden;background-color:#fff;border-radius:20px;padding:40px;box-shadow:0 15px 35px rgba(0,0,0,.2);display:flex;flex-direction:column;justify-content:center}
+.flip-back{transform:rotateY(180deg)}
+.flip-card h2{color:#333;margin-bottom:25px;font-size:28px;font-family:'Segoe UI',var(--pf-font);letter-spacing:normal}
+.flip-card .input-group{margin-bottom:20px;text-align:left}
+.flip-card input{width:100%;padding:12px 15px;border:1px solid #ddd;border-radius:8px;background:#fff;color:#333;outline:none;transition:border-color .3s;font-size:14px;font-family:'Segoe UI',var(--pf-font)}
+.flip-card input:focus{border-color:#667eea}
+.flip-card .btn-login{width:100%;padding:12px;background:#667eea;color:#fff;border:none;border-radius:8px;font-size:16px;font-weight:700;cursor:pointer;transition:background .3s;margin-top:10px;font-family:'Segoe UI',var(--pf-font)}
+.flip-card .btn-login:hover{background:#764ba2}
+.flip-card .switch-text{margin-top:25px;font-size:14px;color:#666}
+.flip-card .switch-text label{color:#667eea;font-weight:700;cursor:pointer;text-decoration:underline}
+.login-error{color:#ef4444;font-size:12px;margin-top:10px;display:none;text-align:center}
+#roleScreen{height:100vh;display:flex;align-items:center;justify-content:center;z-index:10}
+.role-box{text-align:center;max-width:900px;padding:20px}
+.role-box h2{margin-bottom:6px;font-family:'Orbitron',sans-serif;font-size:24px}
+.role-box p{color:var(--pf-text-secondary);font-size:14px;margin-bottom:32px}
+.role-cards{display:flex;gap:16px;flex-wrap:wrap;justify-content:center}
+.role-card{width:220px;padding:24px 20px;background:var(--pf-bg-surface);border:1px solid var(--pf-border);border-radius:var(--pf-radius-lg);cursor:pointer;transition:.2s}
+.role-card:hover{border-color:var(--pf-primary);transform:translateY(-4px);box-shadow:0 8px 24px rgba(0,0,0,.4),0 0 15px var(--pf-primary-light)}
+.role-card .icon{font-size:32px;margin-bottom:12px}
+.role-card h3{font-size:14px;margin-bottom:8px;font-weight:600}
+.role-card p{font-size:12px;color:var(--pf-text-secondary);margin-bottom:0;line-height:1.4}
+.app{display:flex;flex-direction:column;height:100vh;z-index:1}
+.app-body{display:flex;flex:1;overflow:hidden}
+.c-header{height:var(--pf-header-h);display:flex;align-items:center;justify-content:space-between;padding:0 16px;background:linear-gradient(90deg,var(--pf-bg-header),color-mix(in srgb,var(--pf-primary) 6%,var(--pf-bg-header)),var(--pf-bg-header));border-bottom:1px solid color-mix(in srgb,var(--pf-primary) 15%,var(--pf-border));flex-shrink:0}
+.c-header__logo{display:flex;align-items:center;gap:10px;font-family:'Orbitron',sans-serif;font-weight:900;font-size:14px;color:var(--pf-text);text-decoration:none;letter-spacing:1px}
+.c-header__logo svg{width:22px;height:22px;flex-shrink:0}
+.c-header__actions{display:flex;align-items:center;gap:8px}
+.c-header__btn{display:flex;align-items:center;justify-content:center;width:32px;height:32px;border:none;border-radius:var(--pf-radius-sm);background:transparent;color:var(--pf-text-secondary);cursor:pointer;transition:all .15s}
+.c-header__btn:hover{background:var(--pf-bg-hover);color:var(--pf-text)}
+.clock-strip{display:flex;gap:12px;font-size:11px;background:var(--pf-bg-input);border:1px solid var(--pf-border);padding:4px 12px;border-radius:var(--pf-radius-lg);margin-right:12px}
+.clock-strip div{text-align:center}
+.clock-strip .tz-label{opacity:.6;font-size:9px;text-transform:uppercase}
+.c-header__avatar{width:32px;height:32px;border-radius:50%;background:var(--pf-primary);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:600;cursor:pointer}
+.c-dropdown{position:absolute;top:calc(100% + 4px);right:16px;background:var(--pf-bg-surface);border:1px solid var(--pf-border);border-radius:var(--pf-radius);box-shadow:0 8px 24px rgba(0,0,0,.5);min-width:200px;padding:4px;z-index:500}
+.c-dropdown__item{display:flex;align-items:center;gap:8px;padding:8px 12px;font-size:13px;color:var(--pf-text-secondary);cursor:pointer;border-radius:var(--pf-radius-sm);border:none;background:none;width:100%;text-align:left;font-family:var(--pf-font)}
+.c-dropdown__item:hover{background:var(--pf-bg-hover);color:var(--pf-text)}
+.c-dropdown__divider{height:1px;background:var(--pf-border);margin:4px 0}
+.c-sidebar{width:var(--pf-sidebar-w);flex-shrink:0;background:linear-gradient(180deg,var(--pf-bg-sidebar),color-mix(in srgb,var(--pf-primary) 3%,var(--pf-bg-sidebar)));border-right:1px solid color-mix(in srgb,var(--pf-primary) 10%,var(--pf-border));display:flex;flex-direction:column;overflow-y:auto}
+.c-sidebar__section{padding:12px 0}
+.c-sidebar__section-title{padding:6px 16px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--pf-text-muted)}
+.c-sidebar__item{display:flex;align-items:center;gap:10px;padding:8px 16px;font-size:13px;font-weight:500;color:var(--pf-text-secondary);cursor:pointer;border-left:2px solid transparent;transition:all .1s}
+.c-sidebar__item:hover{background:linear-gradient(90deg,color-mix(in srgb,var(--pf-primary) 10%,var(--pf-bg-sidebar)),var(--pf-bg-hover));color:var(--pf-text)}
+.c-sidebar__item.is-active{color:var(--pf-text);background:linear-gradient(90deg,var(--pf-primary-light),color-mix(in srgb,var(--pf-primary) 5%,var(--pf-bg-sidebar)));border-left-color:var(--pf-primary)}
+.c-sidebar__item-icon{width:16px;height:16px;flex-shrink:0;opacity:.7;display:flex;align-items:center;justify-content:center;font-size:14px}
+.c-sidebar__item-count{margin-left:auto;font-size:11px;color:var(--pf-text-muted);background:var(--pf-bg-hover);padding:0 6px;border-radius:3px}
+.c-main{flex:1;display:flex;overflow:hidden;background:var(--pf-bg)}
+.view-container{flex:1;display:flex;flex-direction:column;overflow:hidden;width:100%;height:100%}
+.c-dash{flex:1;overflow-y:auto;padding:24px 32px}
+.c-dash__header{margin-bottom:24px;display:flex;justify-content:space-between;align-items:flex-end}
+.c-dash__title{font-size:22px;font-weight:700;color:var(--pf-text)}
+.c-dash__sub{font-size:13px;color:var(--pf-text-secondary);margin-top:4px}
+.c-dash__grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px}
+.c-dash__card{background:linear-gradient(135deg,var(--pf-bg-surface),color-mix(in srgb,var(--pf-primary) 4%,var(--pf-bg-surface)));border:1px solid var(--pf-border);border-radius:var(--pf-radius-lg);padding:16px;transition:all .3s}
+.c-dash__card:hover{border-color:color-mix(in srgb,var(--pf-primary) 30%,var(--pf-border));transform:translateY(-2px)}
+.c-dash__card-label{font-size:12px;color:var(--pf-text-muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px}
+.c-dash__card-value{font-size:28px;font-weight:700;color:var(--pf-text)}
+.c-dash__card-change{font-size:12px;margin-top:2px}
+.c-dash__card-change.is-up{color:var(--pf-success)}
+.c-dash__card-change.is-down{color:var(--pf-danger)}
+.c-dash__panel{background:var(--pf-bg-surface);border:1px solid var(--pf-border);border-radius:var(--pf-radius-lg);padding:20px;margin-bottom:20px}
+.c-dash__panel-title{font-size:14px;font-weight:600;margin-bottom:16px;color:var(--pf-text)}
+.c-dash__row{display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-bottom:24px}
+.c-dash__card:nth-child(1):hover{box-shadow:0 0 20px color-mix(in srgb,var(--pf-primary) 15%,transparent),0 4px 12px rgba(0,0,0,.2)}
+.c-dash__card:nth-child(2):hover{box-shadow:0 0 20px color-mix(in srgb,var(--pf-danger) 15%,transparent),0 4px 12px rgba(0,0,0,.2)}
+.c-dash__card:nth-child(3):hover{box-shadow:0 0 20px color-mix(in srgb,var(--pf-info) 15%,transparent),0 4px 12px rgba(0,0,0,.2)}
+.c-dash__card:nth-child(4):hover{box-shadow:0 0 20px color-mix(in srgb,var(--pf-success) 15%,transparent),0 4px 12px rgba(0,0,0,.2)}
+table{width:100%;border-collapse:collapse;text-align:left}
+th{padding:10px 12px;font-size:11px;text-transform:uppercase;color:var(--pf-text-muted);border-bottom:1px solid var(--pf-border);font-weight:600;letter-spacing:.5px}
+td{padding:12px;font-size:13px;border-bottom:1px solid var(--pf-border-light);color:var(--pf-text);vertical-align:middle}
+tr:hover td{background:var(--pf-bg-hover)}
+tr:last-child td{border-bottom:none}
+.queue-item{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border:1px solid var(--pf-border);border-radius:var(--pf-radius);margin-bottom:8px;background:var(--pf-bg-input);transition:.2s}
+.queue-item:hover{border-color:var(--pf-primary);background:var(--pf-bg-hover)}
+.qi-main{font-size:14px;font-weight:600;color:var(--pf-text)}
+.qi-sub{font-size:12px;color:var(--pf-text-secondary);margin-top:4px}
+.worker-current{border-radius:var(--pf-radius-lg);padding:24px;margin-bottom:24px;background:linear-gradient(135deg,color-mix(in srgb,var(--pf-primary) 20%,var(--pf-bg-surface)),var(--pf-bg-surface));border:1px solid color-mix(in srgb,var(--pf-primary) 40%,var(--pf-border))}
+.wc-label{font-size:11px;text-transform:uppercase;color:var(--pf-primary);font-weight:700;letter-spacing:1px;margin-bottom:8px}
+.worker-current h3{font-size:20px;color:var(--pf-text);margin-bottom:12px}
+.wc-meta{display:flex;gap:16px;font-size:13px;color:var(--pf-text-secondary);flex-wrap:wrap;margin-bottom:16px}
+.wc-actions{display:flex;gap:10px}
+.c-ticket-list{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.c-ticket-list__toolbar{display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid color-mix(in srgb,var(--pf-primary) 12%,var(--pf-border));background:linear-gradient(90deg,var(--pf-bg-surface),color-mix(in srgb,var(--pf-primary) 3%,var(--pf-bg-surface)));flex-shrink:0}
+.c-ticket-list__filter{padding:5px 10px;border:1px solid var(--pf-border);border-radius:var(--pf-radius);background:var(--pf-bg-input);color:var(--pf-text-secondary);font-size:12px;font-family:var(--pf-font);cursor:pointer;outline:none}
+.c-ticket-list__filter:focus{border-color:var(--pf-primary)}
+.c-ticket-list__scroll{flex:1;overflow-y:auto}
+.c-ticket{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--pf-border-light);cursor:pointer;transition:background .1s}
+.c-ticket:hover{background:linear-gradient(90deg,color-mix(in srgb,var(--pf-primary) 8%,var(--pf-bg)),var(--pf-bg-hover))}
+.c-ticket.is-selected{background:linear-gradient(90deg,var(--pf-primary-light),color-mix(in srgb,var(--pf-primary) 4%,var(--pf-bg)));border-left:2px solid var(--pf-primary)}
+.c-ticket__cb{accent-color:var(--pf-primary);width:14px;height:14px;flex-shrink:0}
+.c-ticket__status{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.c-ticket__status.is-open{background:var(--pf-success)}
+.c-ticket__status.is-pending{background:var(--pf-warning)}
+.c-ticket__status.is-solved{background:var(--pf-text-muted)}
+.c-ticket__id{font-size:12px;color:var(--pf-text-muted);font-family:var(--pf-mono);min-width:56px}
+.c-ticket__subject{flex:1;font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.c-ticket__customer{font-size:12px;color:var(--pf-text-secondary);min-width:120px}
+.c-ticket__agent{font-size:12px;color:var(--pf-text-secondary);min-width:80px}
+.c-ticket__age{font-size:12px;color:var(--pf-text-muted);min-width:48px;text-align:right}
+.c-ticket__priority{font-size:11px;font-weight:600;padding:1px 6px;border-radius:3px;min-width:48px;text-align:center}
+.c-ticket__priority.is-urgent{background:var(--pf-danger-bg);color:var(--pf-danger)}
+.c-ticket__priority.is-high{background:var(--pf-warning-bg);color:var(--pf-warning)}
+.c-ticket__priority.is-normal{background:var(--pf-info-bg);color:var(--pf-info)}
+.c-ticket__priority.is-low{color:var(--pf-text-muted)}
+.c-conv{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.c-conv__header{display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid color-mix(in srgb,var(--pf-primary) 12%,var(--pf-border));background:linear-gradient(90deg,var(--pf-bg-surface),color-mix(in srgb,var(--pf-primary) 4%,var(--pf-bg-surface)));flex-shrink:0}
+.c-conv__back{display:none;align-items:center;gap:4px;padding:4px 8px;border:none;border-radius:var(--pf-radius-sm);background:transparent;color:var(--pf-text-secondary);cursor:pointer;font-size:13px;font-family:var(--pf-font)}
+.c-conv__back:hover{background:var(--pf-bg-hover);color:var(--pf-text)}
+.c-conv__subject{font-size:15px;font-weight:600}
+.c-conv__meta{font-size:12px;color:var(--pf-text-secondary)}
+.c-conv__actions{margin-left:auto;display:flex;gap:4px}
+.c-conv__btn{padding:5px 12px;border:1px solid var(--pf-border);border-radius:var(--pf-radius);background:var(--pf-bg-input);color:var(--pf-text-secondary);cursor:pointer;font-size:12px;font-family:var(--pf-font);display:flex;align-items:center;gap:4px}
+.c-conv__btn:hover{background:var(--pf-bg-hover);color:var(--pf-text)}
+.c-conv__btn--primary{background:var(--pf-primary);border-color:var(--pf-primary);color:#fff}
+.c-conv__btn--primary:hover{background:var(--pf-primary-hover)}
+.c-conv__scroll{flex:1;overflow-y:auto;padding:16px 20px}
+.c-msg{display:flex;gap:10px;margin-bottom:16px;max-width:80%}
+.c-msg.is-customer{align-self:flex-start}
+.c-msg.is-agent{align-self:flex-end;flex-direction:row-reverse;margin-left:auto}
+.c-msg__avatar{width:28px;height:28px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:#fff}
+.c-msg__sender{font-size:11px;font-weight:600;color:var(--pf-text-secondary);margin-bottom:2px}
+.c-msg__bubble{padding:8px 12px;border-radius:var(--pf-radius);font-size:13px;line-height:1.6;background:var(--pf-bg-conv-alt);border:1px solid var(--pf-border)}
+.c-msg.is-agent .c-msg__bubble{background:linear-gradient(135deg,var(--pf-primary-light),color-mix(in srgb,var(--pf-primary) 8%,var(--pf-bg-conv-alt)));border-color:color-mix(in srgb,var(--pf-primary) 20%,transparent)}
+.c-msg__time{font-size:11px;color:var(--pf-text-muted);margin-top:2px}
+.c-reply{padding:12px 20px;border-top:1px solid color-mix(in srgb,var(--pf-primary) 12%,var(--pf-border));background:linear-gradient(0deg,color-mix(in srgb,var(--pf-primary) 4%,var(--pf-bg-surface)),var(--pf-bg-surface));flex-shrink:0}
+.c-reply__textarea{width:100%;min-height:60px;resize:none;border:1px solid var(--pf-border);border-radius:var(--pf-radius);background:var(--pf-bg-input);color:var(--pf-text);padding:8px 12px;font-size:13px;font-family:var(--pf-font);outline:none}
+.c-reply__textarea:focus{border-color:var(--pf-primary)}
+.c-reply__footer{display:flex;align-items:center;justify-content:space-between;margin-top:8px}
+.c-reply__send{padding:6px 16px;border:none;border-radius:var(--pf-radius);background:var(--pf-primary);color:#fff;font-size:13px;font-weight:500;font-family:var(--pf-font);cursor:pointer}
+.c-reply__send:hover{background:var(--pf-primary-hover)}
+.c-context{width:0;overflow:hidden;transition:width .2s;background:linear-gradient(180deg,var(--pf-bg-sidebar),color-mix(in srgb,var(--pf-primary) 3%,var(--pf-bg-sidebar)));border-left:1px solid color-mix(in srgb,var(--pf-primary) 10%,var(--pf-border));display:flex;flex-direction:column}
+.c-context.is-open{width:300px;min-width:300px}
+.c-context__header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--pf-border);flex-shrink:0}
+.c-context__title{font-size:12px;font-weight:600;color:var(--pf-text-muted);text-transform:uppercase;letter-spacing:.05em}
+.c-context__body{flex:1;overflow-y:auto;padding:12px 16px}
+.c-context__sec{margin-bottom:20px}
+.c-context__sec-title{font-size:11px;font-weight:600;color:var(--pf-text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}
+.c-context__field{display:flex;flex-direction:column;gap:2px;margin-bottom:10px}
+.c-context__field-label{font-size:11px;color:var(--pf-text-muted)}
+.c-context__field-value{font-size:13px}
+.c-context__tag{display:inline-flex;align-items:center;gap:3px;padding:2px 6px;border-radius:3px;font-size:11px;font-weight:500;background:var(--pf-bg-code);color:var(--pf-text-secondary)}
+.c-chart{display:flex;align-items:flex-end;gap:6px;height:100px;padding-top:8px}
+.c-chart__bar{flex:1;border-radius:3px 3px 0 0;background:linear-gradient(180deg,var(--pf-primary),color-mix(in srgb,var(--pf-primary) 60%,var(--pf-bg)));opacity:.6;min-height:4px;transition:all .3s}
+.c-chart__bar.is-high{opacity:1}
+.c-spinner{width:20px;height:20px;border:2px solid var(--pf-border);border-top-color:var(--pf-primary);border-radius:50%;animation:spin .6s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+.badge{padding:3px 8px;border-radius:4px;font-size:11px;font-weight:600;text-transform:uppercase;display:inline-block;letter-spacing:.5px}
+.bg-New,.bg-Pending,.bg-pending{background:var(--pf-warning-bg);color:var(--pf-warning);border:1px solid color-mix(in srgb,var(--pf-warning) 20%,transparent)}
+.bg-Open,.bg-open,.bg-InProgress,.bg-Assigned{background:var(--pf-info-bg);color:var(--pf-info);border:1px solid color-mix(in srgb,var(--pf-info) 20%,transparent)}
+.bg-Solved,.bg-solved,.bg-Done,.bg-Completed{background:var(--pf-success-bg);color:var(--pf-success);border:1px solid color-mix(in srgb,var(--pf-success) 20%,transparent)}
+.bg-Urgent,.bg-urgent,.bg-High,.bg-high{background:var(--pf-danger-bg);color:var(--pf-danger);border:1px solid color-mix(in srgb,var(--pf-danger) 20%,transparent)}
+.bg-Normal,.bg-normal{background:var(--pf-info-bg);color:var(--pf-info);border:1px solid color-mix(in srgb,var(--pf-info) 20%,transparent)}
+.bg-Low,.bg-low{background:var(--pf-bg-code);color:var(--pf-text-secondary);border:1px solid var(--pf-border)}
+.c-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:0 16px;height:36px;border:1px solid var(--pf-border);border-radius:var(--pf-radius);background:var(--pf-bg-input);color:var(--pf-text);font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;font-family:var(--pf-font);white-space:nowrap}
+.c-btn:hover{background:var(--pf-bg-hover);border-color:var(--pf-text-muted)}
+.c-btn--primary{background:var(--pf-primary);border-color:var(--pf-primary);color:#fff}
+.c-btn--primary:hover{background:var(--pf-primary-hover)}
+.c-btn--sm{height:28px;padding:0 10px;font-size:12px}
+.c-btn--danger{color:var(--pf-danger);border-color:var(--pf-danger)}
+.c-btn--danger:hover{background:var(--pf-danger-bg)}
+.c-btn--success{color:var(--pf-success);border-color:var(--pf-success)}
+.c-btn--success:hover{background:var(--pf-success-bg)}
+.pf-input,.pf-select,.pf-textarea{width:100%;padding:10px 12px;border:1px solid var(--pf-border);border-radius:var(--pf-radius);background:var(--pf-bg-input);color:var(--pf-text);font-size:13px;outline:none;transition:.2s;font-family:var(--pf-font)}
+.pf-input:focus,.pf-select:focus,.pf-textarea:focus{border-color:var(--pf-primary)}
+.c-modal-overlay{display:none;position:fixed;inset:0;z-index:1000;align-items:center;justify-content:center;background:rgba(0,0,0,.7);backdrop-filter:blur(4px)}
+.c-modal-overlay.active{display:flex}
+.c-modal{width:100%;max-width:500px;background:var(--pf-bg-surface);border:1px solid color-mix(in srgb,var(--pf-primary) 30%,var(--pf-border));border-radius:var(--pf-radius-lg);box-shadow:0 20px 60px rgba(0,0,0,.6);overflow:hidden}
+.c-modal__header{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border-bottom:1px solid var(--pf-border);background:var(--pf-bg-header)}
+.c-modal__title{font-size:16px;font-weight:600;color:var(--pf-text)}
+.c-modal__close{background:none;border:none;color:var(--pf-text-muted);font-size:18px;cursor:pointer;padding:4px}
+.c-modal__close:hover{color:var(--pf-text)}
+.c-modal__body{padding:24px;max-height:70vh;overflow-y:auto}
+.c-modal__footer{padding:16px 24px;border-top:1px solid var(--pf-border);background:var(--pf-bg-header);display:flex;justify-content:flex-end;gap:12px}
+.modal-label{display:block;font-size:12px;font-weight:600;color:var(--pf-text-secondary);margin-bottom:6px;margin-top:16px}
+.modal-label:first-child{margin-top:0}
+.row2{display:flex;gap:16px}
+.row2>div{flex:1}
+.c-toast-stack{position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:12px}
+.c-bg-clock{position:fixed;bottom:24px;left:24px;z-index:0;width:150px;height:150px;opacity:.15;pointer-events:none}
+.c-bg-clock svg{width:100%;height:100%;overflow:visible}
+.c-bg-clock__face{fill:none;stroke:var(--pf-text);stroke-width:1.5;opacity:.5}
+.c-bg-clock__mark{stroke:var(--pf-text);stroke-width:1;opacity:.4}
+.c-bg-clock__mark--major{stroke-width:1.5;opacity:.6}
+.c-bg-clock__hour{stroke:var(--pf-primary);stroke-width:2.5;stroke-linecap:round;opacity:.7}
+.c-bg-clock__min{stroke:var(--pf-text);stroke-width:1.8;stroke-linecap:round;opacity:.5}
+.c-bg-clock__sec{stroke:var(--pf-danger);stroke-width:1;stroke-linecap:round;opacity:.8}
+.c-bg-clock__center{fill:var(--pf-primary);opacity:.6}
+@media(max-width:1200px){.c-dash__grid{grid-template-columns:repeat(2,1fr)}.c-dash__row{grid-template-columns:1fr}.c-context.is-open{width:240px;min-width:240px}}
+@media(max-width:768px){.c-sidebar{display:none}.c-conv__back{display:flex}.c-msg{max-width:95%}}
+@keyframes slideIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+</style>
+</head>
+<body>
+<div class="c-bg-clock" id="bgClock"><svg viewBox="0 0 120 120"><circle class="c-bg-clock__face" cx="60" cy="60" r="54"/><line class="c-bg-clock__mark c-bg-clock__mark--major" x1="60" y1="6" x2="60" y2="14" transform="rotate(0 60 60)"/><line class="c-bg-clock__mark" x1="60" y1="6" x2="60" y2="10" transform="rotate(30 60 60)"/><line class="c-bg-clock__mark" x1="60" y1="6" x2="60" y2="10" transform="rotate(60 60 60)"/><line class="c-bg-clock__mark c-bg-clock__mark--major" x1="60" y1="6" x2="60" y2="14" transform="rotate(90 60 60)"/><line class="c-bg-clock__mark" x1="60" y1="6" x2="60" y2="10" transform="rotate(120 60 60)"/><line class="c-bg-clock__mark" x1="60" y1="6" x2="60" y2="10" transform="rotate(150 60 60)"/><line class="c-bg-clock__mark c-bg-clock__mark--major" x1="60" y1="6" x2="60" y2="14" transform="rotate(180 60 60)"/><line class="c-bg-clock__mark" x1="60" y1="6" x2="60" y2="10" transform="rotate(210 60 60)"/><line class="c-bg-clock__mark" x1="60" y1="6" x2="60" y2="10" transform="rotate(240 60 60)"/><line class="c-bg-clock__mark c-bg-clock__mark--major" x1="60" y1="6" x2="60" y2="14" transform="rotate(270 60 60)"/><line class="c-bg-clock__mark" x1="60" y1="6" x2="60" y2="10" transform="rotate(300 60 60)"/><line class="c-bg-clock__mark" x1="60" y1="6" x2="60" y2="10" transform="rotate(330 60 60)"/><line class="c-bg-clock__hour" id="bgClockHour" x1="60" y1="60" x2="60" y2="32"/><line class="c-bg-clock__min" id="bgClockMin" x1="60" y1="60" x2="60" y2="18"/><line class="c-bg-clock__sec" id="bgClockSec" x1="60" y1="60" x2="60" y2="14"/><circle class="c-bg-clock__center" cx="60" cy="60" r="2.5"/></svg></div>
+
+<div id="loginScreen">
+  <div class="main-container">
+    <input type="checkbox" id="flip-toggle">
+    <div class="flip-card">
+      <div class="flip-card-inner">
+        <div class="flip-front">
+          <h2>Pixofix Ops</h2>
+          <div>
+            <div class="input-group"><input type="text" id="loginUser" placeholder="User ID / Email" autocomplete="off" required></div>
+            <div class="input-group"><input type="password" id="loginPass" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()" required></div>
+            <button class="btn-login" onclick="doLogin()">Login</button>
+            <div class="login-error" id="loginError">Invalid credentials.</div>
+          </div>
+          <div class="switch-text">New user? <label for="flip-toggle">Register here</label></div>
+        </div>
+        <div class="flip-back">
+          <h2>Create Account</h2>
+          <div>
+            <div class="input-group"><input type="text" id="regName" placeholder="Full Name" required></div>
+            <div class="input-group"><input type="email" id="regEmail" placeholder="Email Address" required></div>
+            <div class="input-group"><input type="password" id="regPass" placeholder="Create Password" required></div>
+            <button class="btn-login" onclick="doRegister()">Register</button>
+          </div>
+          <div class="switch-text">Have an account? <label for="flip-toggle">Login here</label></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="changePassScreen" class="hidden" style="height:100vh;display:flex;align-items:center;justify-content:center;z-index:10;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%)">
+  <div style="background:#fff;border-radius:20px;padding:40px;max-width:400px;width:100%;box-shadow:0 15px 35px rgba(0,0,0,.2);text-align:center">
+    <h2 style="color:#333;margin-bottom:8px">First-Time Login</h2>
+    <p style="color:#666;font-size:14px;margin-bottom:24px">Please change your default password</p>
+    <div style="margin-bottom:16px;text-align:left"><label style="font-size:13px;color:#555;display:block;margin-bottom:4px">New Password</label><input type="password" id="newPass1" style="width:100%;padding:12px 15px;border:1px solid #ddd;border-radius:8px;font-size:14px;outline:none" placeholder="Enter new password"></div>
+    <div style="margin-bottom:24px;text-align:left"><label style="font-size:13px;color:#555;display:block;margin-bottom:4px">Confirm Password</label><input type="password" id="newPass2" style="width:100%;padding:12px 15px;border:1px solid #ddd;border-radius:8px;font-size:14px;outline:none" placeholder="Confirm new password" onkeydown="if(event.key==='Enter')doChangePass()"></div>
+    <div style="color:#ef4444;font-size:12px;margin-bottom:12px;display:none" id="changePassError">Passwords do not match</div>
+    <button class="btn-login" onclick="doChangePass()" style="width:100%;padding:12px;background:#667eea;color:#fff;border:none;border-radius:8px;font-size:16px;font-weight:700;cursor:pointer;font-family:'Segoe UI',var(--pf-font)">Set Password</button>
+  </div>
+</div>
+
+<div id="roleScreen" class="hidden">
+  <div class="role-box">
+    <h2 id="roleGreeting">Welcome</h2>
+    <p>Select your operational role for this session</p>
+    <div class="role-cards" id="roleCards"></div>
+  </div>
+</div>
+
+<div id="appShell" class="hidden app">
+  <header class="c-header">
+    <div style="display:flex;align-items:center;gap:16px">
+      <a href="#" class="c-header__logo" onclick="switchRole()"><svg viewBox="0 0 20 20" fill="none"><rect width="20" height="20" rx="4" fill="var(--pf-primary)"/><path d="M5 7l3 3-3 3M10 13h5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pixofix Ops</a>
+      <div style="width:1px;height:24px;background:var(--pf-border)"></div>
+      <span style="font-size:13px;font-weight:600;color:var(--pf-text)" id="currentRoleTitle">Role</span>
+    </div>
+    <div class="c-header__actions">
+      <div class="clock-strip" id="clockStrip"></div>
+      <button class="c-header__btn" onclick="toggleTheme()" title="Theme">🌙</button>
+      <div style="position:relative">
+        <div class="c-header__avatar" onclick="toggleUserMenu(event)" id="userInitials">AD</div>
+        <div class="c-dropdown" id="userMenu" style="display:none">
+          <div style="padding:8px 12px;font-size:12px;color:var(--pf-text-muted)" id="dropdownName">User</div>
+          <div class="c-dropdown__divider"></div>
+          <button class="c-dropdown__item" onclick="switchRole()">🔄 Switch Role</button>
+          <button class="c-dropdown__item" onclick="doLogout()">🚪 Sign Out</button>
+        </div>
+      </div>
+    </div>
+  </header>
+  <div class="app-body">
+    <aside class="c-sidebar" id="sidebarNav"></aside>
+    <main class="c-main" id="mainContent">
+      <div id="viewWorker" class="view-container hidden"></div>
+      <div id="viewCoordinator" class="view-container hidden"></div>
+      <div id="viewSupport" class="view-container hidden"></div>
+      <div id="viewMessages" class="view-container hidden"></div>
+      <div id="viewFeedback" class="view-container hidden"></div>
+      <div id="viewUserManagement" class="view-container hidden"></div>
+      <div id="viewAdminReview" class="view-container hidden"></div>
+    </main>
+  </div>
+</div>
+
+<div class="c-modal-overlay" id="assignModalOverlay">...</div>
+<div class="c-modal-overlay" id="sendEmailModal">...</div>
+<div class="c-modal-overlay" id="feedbackModalOverlay">...</div>
+<div id="toastStack" class="c-toast-stack"></div>
+
+<script>
+// ====== Data Store (localStorage) ======
+const DB_KEY = 'pixofix_db';
+function db() {
+  let d = JSON.parse(localStorage.getItem(DB_KEY));
+  if (!d) {
+    d = {
+      users: [{ id: '1101', username: '1101', password: '1101', name: 'Admin', role: 'Super Admin', roles: ['Super Admin','Support Desk','Workflow Coordinator','Upload Manager','Download Manager'], passChanged: false, createdBy: 'system' }],
+      tickets: [],
+      orders: [],
+      employees: [],
+      messages: [],
+      feedbacks: [],
+      pendingDeletes: [],
+      emailLogs: [],
+      nextId: { ticket: 100, order: 1000, feedback: 100 }
+    };
+    localStorage.setItem(DB_KEY, JSON.stringify(d));
+  }
+  return d;
+}
+function dbSave(d) { localStorage.setItem(DB_KEY, JSON.stringify(d)); }
+function genId(prefix, seq) { const d = db(); const n = d.nextId[seq]++; dbSave(d); return prefix + n; }
+
+// ====== Globals ======
+let currentUser = null, currentRole = null, activeChatPerson = null;
+
+// ====== Auth ======
+function doLogin() {
+  const u = document.getElementById('loginUser').value.trim();
+  const p = document.getElementById('loginPass').value.trim();
+  const d = db();
+  const match = d.users.find(x => (x.username === u || x.id === u) && x.password === p);
+  if (!match) { document.getElementById('loginError').style.display = 'block'; return; }
+  document.getElementById('loginError').style.display = 'none';
+  if (!match.passChanged) {
+    window._pendingUser = match;
+    document.getElementById('loginScreen').classList.add('hidden');
+    document.getElementById('changePassScreen').classList.remove('hidden');
+    return;
+  }
+  completeLogin(match);
+}
+function doChangePass() {
+  const p1 = document.getElementById('newPass1').value;
+  const p2 = document.getElementById('newPass2').value;
+  if (!p1 || p1 !== p2) { document.getElementById('changePassError').style.display = 'block'; return; }
+  document.getElementById('changePassError').style.display = 'none';
+  const d = db();
+  const user = d.users.find(x => x.id === window._pendingUser.id);
+  user.password = p1; user.passChanged = true;
+  dbSave(d);
+  document.getElementById('changePassScreen').classList.add('hidden');
+  completeLogin(user);
+}
+function completeLogin(user) {
+  currentUser = JSON.parse(JSON.stringify(user));
+  document.getElementById('loginScreen').classList.add('hidden');
+  document.getElementById('roleScreen').classList.remove('hidden');
+  const roleMeta = { 'Support Desk': { icon: '🎧', desc: 'Client tickets & comms' }, 'Workflow Coordinator': { icon: '🗂️', desc: 'Assign tasks & track ETAs' }, 'Upload Manager': { icon: '⬆️', desc: 'Outbound file deliveries' }, 'Download Manager': { icon: '⬇️', desc: 'Inbound file retrievals' }, 'Super Admin': { icon: '⚙️', desc: 'System management' } };
+  const container = document.getElementById('roleCards');
+  container.innerHTML = '';
+  (currentUser.roles || [currentUser.role]).forEach(role => {
+    const meta = roleMeta[role];
+    if (!meta) return;
+    const card = document.createElement('div');
+    card.className = 'role-card';
+    card.onclick = () => enterApp(role);
+    card.innerHTML = `<div class="icon">${meta.icon}</div><h3>${role}</h3><p>${meta.desc}</p>`;
+    container.appendChild(card);
+  });
+}
+function roleClass(r) { return { 'Upload Manager':'role-upload', 'Download Manager':'role-download', 'Workflow Coordinator':'role-coordinator', 'Support Desk':'role-support', 'Super Admin':'role-superadmin' }[r] || 'role-none'; }
+function enterApp(role) {
+  currentRole = role;
+  document.getElementById('roleScreen').classList.add('hidden');
+  document.getElementById('appShell').classList.remove('hidden');
+  document.getElementById('userInitials').textContent = currentUser.name.substring(0,2).toUpperCase();
+  document.getElementById('dropdownName').textContent = currentUser.name;
+  document.getElementById('currentRoleTitle').textContent = role;
+  document.body.className = roleClass(role);
+  buildSidebar(); updateClocks();
+  if (!window._clockInt) window._clockInt = setInterval(updateClocks, 1000);
+}
+function showRolePicker() { switchRole(); }
+function switchRole() { document.getElementById('appShell').classList.add('hidden'); document.getElementById('roleScreen').classList.remove('hidden'); document.getElementById('userMenu').style.display = 'none'; }
+function doLogout() { currentUser = null; currentRole = null; document.getElementById('loginUser').value = ''; document.getElementById('loginPass').value = ''; document.getElementById('appShell').classList.add('hidden'); document.getElementById('roleScreen').classList.add('hidden'); document.getElementById('loginScreen').classList.remove('hidden'); document.getElementById('userMenu').style.display = 'none'; document.getElementById('changePassScreen').classList.add('hidden'); }
+function doRegister() {
+  const name = document.getElementById('regName').value.trim(), email = document.getElementById('regEmail').value.trim(), pass = document.getElementById('regPass').value.trim();
+  if (!name || !email || !pass) { showToast('info', 'Fill out all fields'); return; }
+  const d = db();
+  if (d.users.find(x => x.username === email)) { showToast('warning', 'Email already registered'); return; }
+  const newUser = { id: genId('U', 'user'), username: email, password: pass, name, role: 'Support Desk', roles: ['Support Desk'], passChanged: true, createdBy: currentUser?.id || 'self' };
+  d.users.push(newUser); dbSave(d);
+  showToast('success', 'Account created. Please login.');
+  document.getElementById('regName').value = ''; document.getElementById('regEmail').value = ''; document.getElementById('regPass').value = '';
+  document.getElementById('flip-toggle').checked = false;
+}
+function toggleTheme() { const h = document.documentElement; h.setAttribute('data-theme', h.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'); }
+function toggleUserMenu(e) { e.stopPropagation(); const m = document.getElementById('userMenu'); m.style.display = m.style.display === 'block' ? 'none' : 'block'; }
+document.addEventListener('click', e => { const m = document.getElementById('userMenu'); if (m && !e.target.closest('#userMenu') && !e.target.closest('.c-header__avatar')) m.style.display = 'none'; });
+
+// ====== Sidebar ======
+function buildSidebar() {
+  const nav = document.getElementById('sidebarNav');
+  let html = '<div class="c-sidebar__section"><div class="c-sidebar__section-title">Modules</div>';
+  const roles = currentUser.roles || [currentUser.role];
+  roles.forEach(r => {
+    if (r === 'Super Admin') html += `<div class="c-sidebar__item" onclick="selectTab('User Management',this)"><div class="c-sidebar__item-icon">⚙️</div>User Management</div>`;
+    else html += `<div class="c-sidebar__item" onclick="selectTab('${r}',this)"><div class="c-sidebar__item-icon">${r==='Support Desk'?'🎧':r==='Workflow Coordinator'?'🗂️':r==='Upload Manager'?'⬆️':'⬇️'}</div>${r}</div>`;
+  });
+  if (currentUser.role === 'Super Admin' || roles.includes('Super Admin')) html += `<div class="c-sidebar__item" onclick="selectTab('Admin Review',this)"><div class="c-sidebar__item-icon">🔍</div>Pending Reviews</div>`;
+  html += '</div><div class="c-sidebar__section"><div class="c-sidebar__section-title">Communication</div>';
+  html += `<div class="c-sidebar__item" onclick="selectTab('Messages',this)"><div class="c-sidebar__item-icon">💬</div>Team Messages</div>`;
+  html += `<div class="c-sidebar__item" onclick="selectTab('Feedback',this)"><div class="c-sidebar__item-icon">📋</div>Client Feedback</div>`;
+  html += '</div>';
+  nav.innerHTML = html;
+  const ft = nav.querySelector('.c-sidebar__item');
+  if (ft) ft.click();
+}
+function selectTab(key, btnEl) {
+  document.querySelectorAll('.c-sidebar__item').forEach(b => b.classList.remove('is-active'));
+  btnEl.classList.add('is-active');
+  ['viewWorker','viewCoordinator','viewSupport','viewMessages','viewFeedback','viewUserManagement','viewAdminReview'].forEach(id => document.getElementById(id).classList.add('hidden'));
+  if (key === 'Upload Manager' || key === 'Download Manager') { currentRole = key; document.getElementById('currentRoleTitle').textContent = key; document.body.className = roleClass(key); renderWorkerView(key); document.getElementById('viewWorker').classList.remove('hidden'); }
+  else if (key === 'Workflow Coordinator') { currentRole = key; document.getElementById('currentRoleTitle').textContent = key; document.body.className = roleClass(key); renderCoordinatorView(); document.getElementById('viewCoordinator').classList.remove('hidden'); }
+  else if (key === 'Support Desk') { currentRole = key; document.getElementById('currentRoleTitle').textContent = key; document.body.className = roleClass(key); buildSupportSidebar(); renderSupportView(); document.getElementById('viewSupport').classList.remove('hidden'); }
+  else if (key === 'Messages') { renderMessagesView(); document.getElementById('viewMessages').classList.remove('hidden'); }
+  else if (key === 'Feedback') { renderFeedbackView(); document.getElementById('viewFeedback').classList.remove('hidden'); }
+  else if (key === 'User Management') { renderUserManagement(); document.getElementById('viewUserManagement').classList.remove('hidden'); }
+  else if (key === 'Admin Review') { renderAdminReview(); document.getElementById('viewAdminReview').classList.remove('hidden'); }
+}
+function buildSupportSidebar() {
+  const nav = document.getElementById('sidebarNav');
+  nav.innerHTML = `
+    <div class="c-sidebar__section"><div class="c-sidebar__section-title">Support</div>
+      <div class="c-sidebar__item is-active" data-sp="dashboard" onclick="navSupport('dashboard')"><svg class="c-sidebar__item-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>Dashboard</div>
+      <div class="c-sidebar__item" data-sp="tickets" onclick="navSupport('tickets')"><svg class="c-sidebar__item-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 4h14M1 8h14M1 12h10"/><rect x="1" y="2" width="14" height="12" rx="1"/></svg>Tickets <span class="c-sidebar__item-count" id="stCount">0</span></div>
+      <div class="c-sidebar__item" data-sp="customers" onclick="navSupport('customers')"><svg class="c-sidebar__item-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="6" cy="5" r="2.5"/><path d="M1 14c0-2.8 2.2-5 5-5s5 2.2 5 5"/><circle cx="11.5" cy="5" r="2"/><path d="M15 14c0-2.2-1.6-4-3.5-4"/></svg>Customers</div>
+      <div class="c-sidebar__item" data-sp="analytics" onclick="navSupport('analytics')"><svg class="c-sidebar__item-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 14V6M6 14V2M10 14v-5M14 14v-3"/><rect x="1" y="13" width="14" height="1"/></svg>Analytics</div>
+    </div>
+    <div class="c-sidebar__section"><div class="c-sidebar__section-title">Views</div>
+      <div class="c-sidebar__item" data-sp="tickets" data-sv="all" onclick="navSupport('tickets','all')">📋 All Tickets</div>
+      <div class="c-sidebar__item" data-sp="tickets" data-sv="unassigned" onclick="navSupport('tickets','unassigned')">📥 Unassigned</div>
+      <div class="c-sidebar__item" data-sp="tickets" data-sv="my" onclick="navSupport('tickets','my')">👤 My Tickets</div>
+      <div class="c-sidebar__item" data-sp="tickets" data-sv="pending" onclick="navSupport('tickets','pending')">⏳ Pending</div>
+      <div class="c-sidebar__item" data-sp="tickets" data-sv="solved" onclick="navSupport('tickets','solved')">✅ Solved</div>
+    </div>
+    <div class="c-sidebar__section"><div class="c-sidebar__section-title">Comms</div>
+      <div class="c-sidebar__item" onclick="selectTab('Messages', this)">💬 Team Messages</div>
+      <div class="c-sidebar__item" onclick="selectTab('Feedback', this)">📋 Client Feedback</div>
+    </div>`;
+  updateTicketCount();
+}
+
+// ====== Clocks ======
+function updateClocks() {
+  const strip = document.getElementById('clockStrip');
+  if (strip) strip.innerHTML = [{c:'CBI',tz:'America/New_York'},{c:'FSA',tz:'Europe/London'},{c:'Local',tz:Intl.DateTimeFormat().resolvedOptions().timeZone}].map(x => `<div><div style="font-weight:600;color:var(--pf-text)">${new Date().toLocaleTimeString('en-US',{timeZone:x.tz,hour:'2-digit',minute:'2-digit'})}</div><div class="tz-label">${x.c}</div></div>`).join('');
+  const now = new Date();
+  const hDeg = ((now.getHours() % 12) * 30) + (now.getMinutes() * 0.5), mDeg = (now.getMinutes() * 6) + (now.getSeconds() * 0.1), sDeg = (now.getSeconds() * 6);
+  const hH = document.getElementById('bgClockHour'); if(hH) hH.setAttribute('transform', `rotate(${hDeg} 60 60)`);
+  const mH = document.getElementById('bgClockMin'); if(mH) mH.setAttribute('transform', `rotate(${mDeg} 60 60)`);
+  const sH = document.getElementById('bgClockSec'); if(sH) sH.setAttribute('transform', `rotate(${sDeg} 60 60)`);
+}
+setInterval(updateClocks, 50);
+
+// ====== Toast ======
+function showToast(type, msg) {
+  const stack = document.getElementById('toastStack');
+  const t = document.createElement('div');
+  const c = type==='success'?'var(--pf-success)':type==='warning'?'var(--pf-warning)':type==='danger'?'var(--pf-danger)':'var(--pf-primary)';
+  t.style.cssText = `display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:var(--pf-radius);background:var(--pf-bg-surface);border:1px solid var(--pf-border);box-shadow:0 8px 24px rgba(0,0,0,.5);font-size:13px;animation:slideIn .2s ease-out;border-left:4px solid ${c}`;
+  t.innerHTML = `<span style="flex:1;color:var(--pf-text)">${msg}</span>`;
+  stack.appendChild(t);
+  setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translateY(10px)'; t.style.transition = 'all .2s'; setTimeout(() => t.remove(), 200); }, 3000);
+}
+
+// ====== Admin Review ======
+function renderAdminReview() {
+  const d = db();
+  const pending = d.pendingDeletes || [];
+  document.getElementById('viewAdminReview').innerHTML = `
+    <div class="c-dash">
+      <div class="c-dash__header"><div><div class="c-dash__title">Pending Reviews</div><div class="c-dash__sub">Items awaiting admin approval for deletion</div></div></div>
+      <div class="c-dash__panel">
+        ${pending.length ? `<table><thead><tr><th>Item</th><th>Type</th><th>Requested By</th><th>Date</th><th>Action</th></tr></thead><tbody>
+          ${pending.map(p => `<tr><td>${p.label}</td><td><span class="badge bg-normal">${p.type}</span></td><td>${p.requestedBy}</td><td style="color:var(--pf-text-muted)">${p.date}</td>
+          <td><button class="c-btn c-btn--sm c-btn--success" onclick="approveDelete('${p.id}')">✓ Approve</button> <button class="c-btn c-btn--sm c-btn--danger" onclick="rejectDelete('${p.id}')">✕ Reject</button></td></tr>`).join('')}
+        </tbody></table>` : '<div style="padding:20px;text-align:center;color:var(--pf-text-muted)">No pending reviews</div>'}
+      </div>
+    </div>`;
+}
+function approveDelete(id) {
+  const d = db();
+  const item = d.pendingDeletes.find(p => p.id === id);
+  if (item) {
+    if (item.collection === 'orders') d.orders = d.orders.filter(x => x.id !== item.refId);
+    else if (item.collection === 'tickets') d.tickets = d.tickets.filter(x => x.id !== item.refId);
+    else if (item.collection === 'feedbacks') d.feedbacks = d.feedbacks.filter(x => x.id !== item.refId);
+    else if (item.collection === 'messages') d.messages = d.messages.filter(x => x.id !== item.refId);
+  }
+  d.pendingDeletes = d.pendingDeletes.filter(p => p.id !== id);
+  dbSave(d); renderAdminReview(); showToast('success', 'Item deleted');
+}
+function rejectDelete(id) {
+  const d = db(); d.pendingDeletes = d.pendingDeletes.filter(p => p.id !== id);
+  dbSave(d); renderAdminReview(); showToast('info', 'Deletion rejected');
+}
+function requestDelete(type, label, refId, afterCb) {
+  if (currentUser.id === '1101') {
+    if (afterCb) afterCb();
+    showToast('success', 'Item deleted');
+    return;
+  }
+  const d = db();
+  d.pendingDeletes.push({ id: genId('PD', 'order'), type, label, refId, collection: type === 'Order' ? 'orders' : type === 'Ticket' ? 'tickets' : type === 'Feedback' ? 'feedbacks' : 'messages', requestedBy: currentUser.name, date: new Date().toLocaleDateString() });
+  dbSave(d); showToast('warning', 'Delete request sent to admin for review');
+}
+
+// ====== Edit Modal Helper ======
+function openEditModal(title, fields, onSave) {
+  const overlay = document.createElement('div');
+  overlay.className = 'c-modal-overlay'; overlay.style.display = 'flex';
+  let body = fields.map(f => {
+    if (f.type === 'select') return `<label class="modal-label">${f.label}</label><select class="pf-select" id="ef_${f.key}">${f.options.map(o => `<option ${f.value===o?'selected':''}>${o}</option>`).join('')}</select>`;
+    if (f.type === 'textarea') return `<label class="modal-label">${f.label}</label><textarea class="pf-textarea" id="ef_${f.key}" rows="3">${f.value||''}</textarea>`;
+    if (f.type === 'checkbox') return `<div style="margin-top:12px"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px"><input type="checkbox" id="ef_${f.key}" ${f.value?'checked':''} style="accent-color:var(--pf-primary)"> ${f.label}</label></div>`;
+    return `<label class="modal-label">${f.label}</label><input class="pf-input" id="ef_${f.key}" value="${f.value||''}" ${f.type==='number'?'type="number"':''}>`;
+  }).join('');
+  overlay.innerHTML = `<div class="c-modal"><div class="c-modal__header"><div class="c-modal__title">${title}</div><button class="c-modal__close" onclick="this.closest('.c-modal-overlay').remove()">✕</button></div><div class="c-modal__body">${body}</div><div class="c-modal__footer"><button class="c-btn" onclick="this.closest('.c-modal-overlay').remove()">Cancel</button><button class="c-btn c-btn--primary" id="editSaveBtn">Save</button></div></div>`;
+  document.body.appendChild(overlay);
+  document.getElementById('editSaveBtn').onclick = () => {
+    const vals = {};
+    fields.forEach(f => { const el = document.getElementById('ef_' + f.key); vals[f.key] = el.type === 'checkbox' ? el.checked : el.value; });
+    onSave(vals); overlay.remove();
+  };
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+}
+
+// ====== Worker View ======
+function renderWorkerView(roleType) {
+  const d = db();
+  const myTasks = d.orders.filter(o => o.assignedTo === currentUser.name);
+  const current = myTasks.find(o => o.status === 'InProgress');
+  const pending = myTasks.filter(o => o.status === 'Assigned');
+  const completed = myTasks.filter(o => o.status === 'Completed');
+  let ch = current ? `<div class="worker-current"><div class="wc-label">Active Task IN PROGRESS</div><h3>${current.style} — ${current.client}</h3><div class="wc-meta"><span class="badge bg-${current.priority}">${current.priority}</span><span>Qty: ${current.qty}</span><span>ETA: ${current.eta||'N/A'}</span></div><div style="font-size:13px;background:var(--pf-bg-code);padding:10px;border-radius:var(--pf-radius);margin-bottom:16px">${current.instructions||''}</div><div class="wc-actions"><button class="c-btn c-btn--primary" onclick="showToast('info','Opening folder')">📂 Open Drive</button><button class="c-btn" style="border-color:var(--pf-success);color:var(--pf-success)" onclick="completeTask('${current.id}')">✓ Mark Complete</button></div></div>` : `<div class="c-dash__panel"><div style="text-align:center;padding:30px;color:var(--pf-text-muted)">No active task</div></div>`;
+  document.getElementById('viewWorker').innerHTML = `<div class="c-dash"><div class="c-dash__header"><div><div class="c-dash__title">${roleType}</div><div class="c-dash__sub">Your queue</div></div></div><div class="c-dash__grid"><div class="c-dash__card"><div class="c-dash__card-label">Pending</div><div class="c-dash__card-value">${pending.length}</div></div><div class="c-dash__card"><div class="c-dash__card-label">Completed Today</div><div class="c-dash__card-value" style="color:var(--pf-success)">${completed.length}</div></div></div>${ch}<div class="row2"><div class="c-dash__panel"><div class="c-dash__panel-title">Pending Queue</div>${pending.length ? pending.map(o => `<div class="queue-item"><div><div class="qi-main">${o.style} — ${o.client}</div><div class="qi-sub">Qty: ${o.qty} <span class="badge bg-${o.priority}">${o.priority}</span></div></div><button class="c-btn c-btn--primary c-btn--sm" ${current?'disabled':''} onclick="startTask('${o.id}')">Start</button></div>`).join('') : '<div style="color:var(--pf-text-muted)">Queue empty</div>'}</div><div class="c-dash__panel"><div class="c-dash__panel-title">Recently Completed</div>${completed.length ? completed.map(o => `<div class="queue-item"><div><div class="qi-main">${o.style}</div><div class="qi-sub">${o.client}</div></div></div>`).join('') : '<div style="color:var(--pf-text-muted)">None</div>'}</div></div></div>`;
+}
+function startTask(id) { const d = db(); const o = d.orders.find(x => x.id === id); if(o) o.status = 'InProgress'; dbSave(d); renderWorkerView(currentRole); showToast('info', 'Started'); }
+function completeTask(id) { const d = db(); const o = d.orders.find(x => x.id === id); if(o) { o.status = 'Completed'; o.completedAt = new Date().toISOString().slice(0,10); } dbSave(d); renderWorkerView(currentRole); showToast('success', 'Complete'); }
+
+// ====== Coordinator View ======
+function renderCoordinatorView() {
+  const d = db();
+  const unassigned = d.orders.filter(o => o.status === 'Pending');
+  const late = d.orders.filter(o => o.eta && (new Date(o.eta) - new Date()) / 86400000 < 0);
+  document.getElementById('viewCoordinator').innerHTML = `<div class="c-dash"><div class="c-dash__header"><div><div class="c-dash__title">Workflow Coordinator</div><div class="c-dash__sub">Task routing & SLA tracking</div></div><button class="c-btn c-btn--primary c-glow" onclick="openAssignModal()">+ Assign Task</button></div><div class="c-dash__grid"><div class="c-dash__card"><div class="c-dash__card-label">Unassigned</div><div class="c-dash__card-value">${unassigned.length}</div></div><div class="c-dash__card"><div class="c-dash__card-label">SLA Breach</div><div class="c-dash__card-value" style="color:var(--pf-danger)">${late.length}</div></div></div><div class="c-dash__panel c-surface-gradient"><div class="c-dash__panel-title">Master Order Queue</div><table><thead><tr><th>ETA</th><th>Order</th><th>Client</th><th>Assignee</th><th>Priority</th><th>Status</th><th>Actions</th></tr></thead><tbody>${d.orders.map(o => { const il = o.eta && (new Date(o.eta) - new Date())/86400000 < 0; return `<tr><td style="${il?'color:var(--pf-danger);font-weight:600':''}">${o.eta||'-'}</td><td><strong>${o.style}</strong><br><span style="font-size:10px;opacity:.6;font-family:var(--pf-mono)">${o.id}</span></td><td>${o.client}</td><td>${o.assignedTo||'<span style="opacity:.5">Unassigned</span>'}</td><td><select onchange="editOrderField('${o.id}','priority',this.value)" class="pf-select" style="padding:4px;height:auto;font-size:11px">${['Low','Normal','High','Urgent'].map(p => `<option ${p===o.priority?'selected':''}>${p}</option>`).join('')}</select></td><td><span class="badge bg-${o.status}">${o.status}</span></td><td><button class="c-btn c-btn--sm" onclick="editOrder('${o.id}')">✏️</button> <button class="c-btn c-btn--sm c-btn--danger" onclick="deleteOrder('${o.id}')">🗑️</button></td></tr>`}).join('')}</tbody></table></div></div>`;
+}
+function editOrder(id) {
+  const d = db(); const o = d.orders.find(x => x.id === id); if (!o) return;
+  openEditModal('Edit Task', [
+    { key: 'client', label: 'Client', value: o.client },
+    { key: 'style', label: 'Order Ref', value: o.style },
+    { key: 'qty', label: 'Image Qty', type: 'number', value: o.qty },
+    { key: 'eta', label: 'ETA', value: o.eta },
+    { key: 'instructions', label: 'Instructions', type: 'textarea', value: o.instructions },
+    { key: 'refs', label: 'Reference images provided', type: 'checkbox', value: o.refs },
+  ], vals => { Object.assign(o, vals); o.qty = parseInt(o.qty) || 0; o.refs = vals.refs === true || vals.refs === 'true'; dbSave(d); renderCoordinatorView(); showToast('success', 'Updated'); });
+}
+function deleteOrder(id) { requestDelete('Order', 'Order ' + id, id, () => { const d = db(); d.orders = d.orders.filter(x => x.id !== id); dbSave(d); renderCoordinatorView(); }); }
+function editOrderField(id, field, val) { const d = db(); const o = d.orders.find(x => x.id === id); if(o) o[field] = val; dbSave(d); showToast('info', 'Updated'); }
+
+// ====== Support Desk ======
+let supportPage = 'dashboard', supportView = 'all', selectedTicketId = null;
+function renderSupportView() { navSupport(supportPage, supportView); }
+function navSupport(page, view, el) {
+  if (!el) el = document.getElementById('viewSupport');
+  supportPage = page; supportView = view || 'all';
+  document.querySelectorAll('#sidebarNav .c-sidebar__item[data-sp]').forEach(b => b.classList.remove('is-active'));
+  const act = document.querySelector(`#sidebarNav .c-sidebar__item[data-sp="${page}"]`);
+  if (act) act.classList.add('is-active');
+  if (page === 'dashboard') renderSupportDashboard(el);
+  else if (page === 'tickets') renderSupportTickets(el);
+  else if (page === 'customers') renderSupportCustomers(el);
+  else if (page === 'analytics') renderSupportAnalytics(el);
+  updateTicketCount();
+}
+function updateTicketCount() {
+  const d = db(); const el = document.getElementById('stCount');
+  if (el) el.textContent = (d.tickets || []).length;
+}
+
+// Email fetch via Vercel serverless function
+function getImapConfig() {
+  try { return JSON.parse(localStorage.getItem('pixofix_imap') || '{}'); } catch { return {}; }
+}
+function saveImapConfig(cfg) { localStorage.setItem('pixofix_imap', JSON.stringify(cfg)); }
+function showImapConfigModal() {
+  const cfg = getImapConfig();
+  openEditModal('IMAP Email Settings (support@pixofix.com)', [
+    { key: 'host', label: 'IMAP Host', value: cfg.host || 'imap.gmail.com' },
+    { key: 'port', label: 'Port', value: cfg.port || '993' },
+    { key: 'user', label: 'Email', value: cfg.user || 'support@pixofix.com' },
+    { key: 'pass', label: 'Password / App Password', value: cfg.pass || '', type: 'password' }
+  ], (vals) => {
+    saveImapConfig({ host: vals.host, port: parseInt(vals.port) || 993, user: vals.user, pass: vals.pass });
+    showToast('success', 'IMAP settings saved');
+  });
+}
+async function fetchEmails() {
+  const cfg = getImapConfig();
+  if (!cfg.host || !cfg.user || !cfg.pass) {
+    showImapConfigModal();
+    return;
+  }
+  showToast('info', 'Fetching emails from support@pixofix.com...');
+  try {
+    const resp = await fetch('/api/fetch-emails', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ host: cfg.host, port: cfg.port, user: cfg.user, pass: cfg.pass })
+    });
+    const data = await resp.json();
+    if (data.emails && data.emails.length > 0) {
+      const d = db();
+      let created = 0;
+      data.emails.forEach(e => {
+        const exists = (d.tickets || []).some(t => t.emailId === e.id || t.emailSubject === e.subject && t.emailFrom === e.from);
+        if (exists) return;
+        const t = {
+          id: genId('TKT', 'ticket'), subject: e.subject, client: e.from,
+          status: 'Open', priority: 'Medium', description: e.text,
+          category: 'Email', agent: '', createdBy: 'system',
+          createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+          rtc: '', summary: '', emailId: e.id, emailSubject: e.subject, emailFrom: e.from
+        };
+        (d.tickets = d.tickets || []).push(t);
+        created++;
+      });
+      dbSave(d);
+      showToast('success', `${created} tickets created from email` + (data.count > created ? ` (${data.count - created} duplicates skipped)` : ''));
+      navSupport('tickets');
+    } else if (data.emails && data.emails.length === 0) {
+      showToast('success', 'No new emails found');
+    } else {
+      showToast('warning', data.error || 'Failed to fetch emails');
+    }
+  } catch(e) {
+    showToast('error', 'Could not reach email server: ' + e.message);
+  }
+}
+
+function renderSupportDashboard(el) {
+  selectedTicketId = null;
+  const d = db(); const tickets = d.tickets || [];
+  const openCount = tickets.filter(t => t.status === 'open').length;
+  const urgentCount = tickets.filter(t => t.priority === 'urgent').length;
+  el.innerHTML = `
+    <div class="c-dash">
+      <div class="c-dash__header"><div><div class="c-dash__title">Support Dashboard</div><div class="c-dash__sub">Welcome, ${currentUser.name}</div></div><div style="display:flex;gap:8px">
+        <button class="c-btn" onclick="fetchEmails()">📧 Fetch Emails</button>
+        <button class="c-btn c-btn--primary" onclick="openNewTicketModal()">+ New Ticket</button></div>
+      </div>
+      <div class="c-dash__grid">
+        <div class="c-dash__card"><div class="c-dash__card-label">Open Tickets</div><div class="c-dash__card-value">${openCount}</div></div>
+        <div class="c-dash__card"><div class="c-dash__card-label">Urgent</div><div class="c-dash__card-value">${urgentCount}</div></div>
+        <div class="c-dash__card"><div class="c-dash__card-label">Total Tickets</div><div class="c-dash__card-value">${tickets.length}</div></div>
+        <div class="c-dash__card"><div class="c-dash__card-label">Avg Age</div><div class="c-dash__card-value">${tickets.length ? Math.round(tickets.reduce((s,t) => s + parseInt(t.age||'0'), 0) / tickets.length) : 0}m</div></div>
+      </div>
+      <div class="c-dash__row">
+        <div class="c-dash__panel"><div class="c-dash__panel-title">Recent Tickets</div>${tickets.slice(0,5).map(t => `<div class="c-ticket" onclick="openSupportTicket(${t.id})"><span class="c-ticket__status is-${t.status}"></span><span class="c-ticket__id">#${t.id}</span><span class="c-ticket__subject">${t.subject}</span><span class="c-ticket__customer">${t.customer||'—'}</span><span class="c-ticket__priority is-${t.priority}">${t.priority}</span></div>`).join('')||'<div style="color:var(--pf-text-muted)">No tickets yet</div>'}</div>
+        <div class="c-dash__panel"><div class="c-dash__panel-title">Email Log</div><div class="c-dash__panel" style="padding:12px;font-size:12px;color:var(--pf-text-secondary);display:flex;flex-direction:column;gap:8px"><div><span style="color:var(--pf-info)">support@pixofix.com</span> — ${getImapConfig().host ? `<span style="color:var(--pf-success)">✓ IMAP configured (${getImapConfig().host})</span>` : `<span style="color:var(--pf-warning)">⚠ Not configured</span>`}</div><button class="c-btn c-btn--sm" onclick="showImapConfigModal()">⚙ Configure IMAP</button></div></div>
+      </div>
+    </div>`;
+}
+function renderSupportTickets(el) {
+  const d = db(); const tickets = d.tickets || [];
+  const filter = supportView;
+  let filtered = [...tickets];
+  if (filter === 'unassigned') filtered = filtered.filter(t => t.agent === '—');
+  else if (filter === 'my') filtered = filtered.filter(t => t.agent === currentUser.name);
+  else if (filter === 'pending') filtered = filtered.filter(t => t.status === 'pending');
+  else if (filter === 'solved') filtered = filtered.filter(t => t.status === 'solved');
+  const ticket = selectedTicketId ? tickets.find(t => t.id === selectedTicketId) : null;
+  el.innerHTML = `<div class="c-conv" style="flex:1;height:100%">
+    <div class="c-conv__header">
+      <button class="c-conv__back" onclick="closeSupportTicket()">← Back</button>
+      <div><div class="c-conv__subject">${ticket ? '#'+ticket.id+' '+ticket.subject : 'All Tickets'}</div><div class="c-conv__meta">${ticket ? ticket.customer + ' · ' + ticket.priority + ' priority' : filtered.length + ' tickets'}</div></div>
+      <div class="c-conv__actions">${ticket ? `
+        <select class="c-ticket-list__filter" onchange="editTicketField('${ticket.id}','status',this.value)" style="width:auto">
+          <option value="open" ${ticket.status==='open'?'selected':''}>Open</option>
+          <option value="pending" ${ticket.status==='pending'?'selected':''}>Pending</option>
+          <option value="solved" ${ticket.status==='solved'?'selected':''}>Solved</option>
+        </select>
+        <button class="c-conv__btn" onclick="editTicket('${ticket.id}')">✏️ Edit</button>
+        <button class="c-conv__btn c-btn--danger" onclick="deleteTicket('${ticket.id}')">🗑️</button>
+        <button class="c-conv__btn c-conv__btn--primary" onclick="openNewTicketModal()">+ New</button>
+      ` : `
+        <select class="c-ticket-list__filter" onchange="supportView=this.value;navSupport('tickets',this.value)">
+          <option value="all" ${filter==='all'?'selected':''}>All</option>
+          <option value="open" ${filter==='open'?'selected':''}>Open</option>
+          <option value="pending" ${filter==='pending'?'selected':''}>Pending</option>
+          <option value="solved" ${filter==='solved'?'selected':''}>Solved</option>
+        </select>
+        <button class="c-btn" onclick="fetchEmails()">📧 Fetch</button>
+        <button class="c-conv__btn c-conv__btn--primary" onclick="openNewTicketModal()">+ New</button>
+      `}</div>
+    </div>
+    ${ticket ? renderTicketDetail(ticket) : renderTicketList(filtered)}
+    ${ticket ? renderContextPanel(ticket) : ''}</div>`;
+  if (ticket) document.querySelectorAll('.c-context').forEach(el => el.classList.add('is-open'));
+}
+function renderTicketList(tickets) {
+  return `<div class="c-ticket-list"><div class="c-ticket-list__toolbar"><span style="font-size:12px;color:var(--pf-text-muted)">${tickets.length} tickets</span></div><div class="c-ticket-list__scroll">${tickets.map(t => `<div class="c-ticket" onclick="openSupportTicket(${t.id})"><input type="checkbox" class="c-ticket__cb" onclick="event.stopPropagation()"><span class="c-ticket__status is-${t.status}"></span><span class="c-ticket__id">#${t.id}</span><span class="c-ticket__subject">${t.subject}</span><span class="c-ticket__customer">${t.customer||'—'}</span><span class="c-ticket__agent">${t.agent||'—'}</span><span class="c-ticket__priority is-${t.priority}">${t.priority}</span><span class="c-ticket__age">${t.age||'—'}</span></div>`).join('')}</div></div>`;
+}
+function renderTicketDetail(ticket) {
+  const msgs = ticket.messages || [{ from:'customer', name: ticket.customer||'Customer', avatar:'#7c3aed', text:'No messages yet', time:'' }];
+  const canned = ['Status update: We are working on it','Please provide more details','This has been escalated','Thank you for your patience','We have resolved this issue'];
+  return `<div class="c-conv__scroll" style="flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column">${msgs.map(m => `<div class="c-msg is-${m.from}"><div class="c-msg__avatar" style="background:${m.avatar||'#7c3aed'}">${m.name.split(' ').map(n=>n[0]).join('')}</div><div class="c-msg__body"><div class="c-msg__sender">${m.name}</div><div class="c-msg__bubble">${m.text}</div><div class="c-msg__time">${m.time}</div></div></div>`).join('')}</div>
+    <div class="c-reply">
+      <div style="display:flex;gap:4px;margin-bottom:6px;flex-wrap:wrap">${canned.map(c => `<span class="c-btn c-btn--sm" onclick="useCanned('${c}')" style="font-size:10px;padding:2px 8px;height:auto">${c.substring(0,20)}…</span>`).join('')}</div>
+      <textarea id="replyText" class="c-reply__textarea" placeholder="Reply... (RTC recommended before sending public reply)" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendSupportReply()}"></textarea>
+      <div class="c-reply__footer">
+        <div style="display:flex;gap:8px;align-items:center;font-size:12px">
+          <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="internalNote" style="accent-color:var(--pf-warning)"> Internal</label>
+          <span style="color:var(--pf-text-muted)">|</span>
+          <select class="pf-select" style="width:auto;height:28px;padding:2px 8px;font-size:11px" id="rtcSelect">
+            <option value="">Set RTC…</option>
+            <option value="Status Update">Status Update</option>
+            <option value="Revision Request">Revision Request</option>
+            <option value="Missing Files">Missing Files</option>
+            <option value="Billing/Quote">Billing/Quote</option>
+            <option value="General Inquiry">General Inquiry</option>
+          </select>
+        </div>
+        <button class="c-reply__send" onclick="sendSupportReply()">Send</button>
+      </div>
+    </div>`;
+}
+function renderContextPanel(ticket) {
+  return `<div class="c-context is-open"><div class="c-context__header"><span class="c-context__title">Ticket Details</span></div><div class="c-context__body">
+    <div class="c-context__sec"><div class="c-context__sec-title">Status</div><span class="c-context__tag" style="background:${ticket.status==='open'?'var(--pf-success-bg)':ticket.status==='pending'?'var(--pf-warning-bg)':'var(--pf-bg-code)'};color:${ticket.status==='open'?'var(--pf-success)':ticket.status==='pending'?'var(--pf-warning)':'var(--pf-text-secondary)'}">${ticket.status.charAt(0).toUpperCase()+ticket.status.slice(1)}</span></div>
+    <div class="c-context__sec"><div class="c-context__sec-title">Assignee</div><div class="c-context__field-value">${ticket.agent||'—'}</div></div>
+    <div class="c-context__sec"><div class="c-context__sec-title">Requester</div><div class="c-context__field-value">${ticket.customer||'—'}</div></div>
+    <div class="c-context__sec"><div class="c-context__sec-title">Priority</div><span class="c-ticket__priority is-${ticket.priority}">${ticket.priority}</span></div>
+    <div class="c-context__sec"><div class="c-context__sec-title">RTC (Reason to Contact)</div><div class="c-context__field-value">${ticket.rtc||'Not set'}</div></div>
+    <div class="c-context__sec"><div class="c-context__sec-title">Agent Summary</div><textarea class="pf-textarea" rows="3" style="font-size:12px" id="agentSummaryInput">${ticket.summary||''}</textarea><button class="c-btn c-btn--sm" style="width:100%;margin-top:6px" onclick="saveTicketSummary('${ticket.id}')">Save Summary</button></div>
+    <div class="c-context__sec"><div class="c-context__sec-title">Source</div><div class="c-context__field-value">${ticket.source||'Manual'}</div></div>
+    <div class="c-context__sec"><div class="c-context__sec-title">Created</div><div class="c-context__field-value">${ticket.age||'Today'} ago</div></div>
+  </div></div>`;
+}
+function useCanned(t) { document.getElementById('replyText').value = t; }
+function sendSupportReply() {
+  const ta = document.getElementById('replyText');
+  if (!ta || !ta.value.trim()) return;
+  const d = db(); const ticket = (d.tickets || []).find(t => t.id === selectedTicketId);
+  if (!ticket) return;
+  const isPub = !document.getElementById('internalNote').checked;
+  const rtc = document.getElementById('rtcSelect')?.value;
+  if (isPub && !ticket.rtc && rtc) ticket.rtc = rtc;
+  if (isPub && !ticket.rtc) { showToast('warning', 'Please set an RTC for analytics'); }
+  if (!ticket.messages) ticket.messages = [];
+  ticket.messages.push({ from: isPub ? 'agent' : 'agent', name: currentUser.name, avatar: '#2563eb', text: (isPub ? '' : '[INTERNAL] ') + ta.value.trim(), time: new Date().toLocaleTimeString() });
+  ta.value = ''; dbSave(d); renderSupportTickets(document.getElementById('viewSupport')); showToast('success', 'Sent');
+}
+function saveTicketSummary(id) {
+  const d = db(); const t = (d.tickets || []).find(x => x.id === id);
+  if (t) t.summary = document.getElementById('agentSummaryInput')?.value || '';
+  dbSave(d); showToast('success', 'Summary saved');
+}
+function openSupportTicket(id) { selectedTicketId = id; renderSupportTickets(document.getElementById('viewSupport')); }
+function closeSupportTicket() { selectedTicketId = null; renderSupportTickets(document.getElementById('viewSupport')); }
+function editTicket(id) {
+  const d = db(); const t = (d.tickets || []).find(x => x.id === id); if (!t) return;
+  openEditModal('Edit Ticket', [
+    { key: 'subject', label: 'Subject', value: t.subject },
+    { key: 'customer', label: 'Customer', value: t.customer },
+    { key: 'agent', label: 'Assignee', value: t.agent },
+    { key: 'priority', label: 'Priority', type: 'select', value: t.priority, options: ['Low','Normal','High','Urgent'] },
+    { key: 'rtc', label: 'RTC (Reason to Contact)', type: 'select', value: t.rtc||'', options: ['','Status Update','Revision Request','Missing Files','Billing/Quote','General Inquiry'] },
+  ], vals => { Object.assign(t, vals); dbSave(d); renderSupportTickets(document.getElementById('viewSupport')); showToast('success', 'Updated'); });
+}
+function deleteTicket(id) { requestDelete('Ticket', 'Ticket #' + id, id, () => { const d = db(); d.tickets = (d.tickets || []).filter(x => x.id !== id); dbSave(d); navSupport('tickets'); }); }
+function editTicketField(id, field, val) { const d = db(); const t = (d.tickets || []).find(x => x.id === id); if(t) t[field] = val; dbSave(d); showToast('info', 'Updated'); }
+
+function renderSupportCustomers(el) {
+  selectedTicketId = null;
+  const d = db(); const tickets = d.tickets || [];
+  const customers = [...new Set(tickets.map(t => t.customer).filter(Boolean))];
+  el.innerHTML = `<div class="c-dash"><div class="c-dash__header"><div><div class="c-dash__title">Customers</div><div class="c-dash__sub">${customers.length} customers</div></div></div><div class="c-dash__grid" style="grid-template-columns:repeat(3,1fr)">${customers.map(c => { const tc = tickets.filter(t => t.customer === c).length; return `<div style="display:flex;align-items:center;gap:12px;background:var(--pf-bg-surface);border:1px solid var(--pf-border);border-radius:var(--pf-radius-lg);padding:12px"><div style="width:36px;height:36px;border-radius:50%;background:var(--pf-primary);display:flex;align-items:center;justify-content:center;color:white;font-size:12px;font-weight:600">${c.split(' ').map(n=>n[0]).join('')}</div><div><div style="font-size:13px;font-weight:500">${c}</div><div style="font-size:11px;color:var(--pf-text-muted)">${tc} tickets</div></div></div>`}).join('')||'<div style="color:var(--pf-text-muted)">No customers yet</div>'}</div></div>`;
+}
+function renderSupportAnalytics(el) {
+  selectedTicketId = null;
+  const d = db(); const tickets = d.tickets || [];
+  const solved = tickets.filter(t => t.status === 'solved').length;
+  const avgResp = tickets.length ? Math.round(tickets.reduce((s,t) => s + parseInt(t.age||'0'), 0) / tickets.length) : 0;
+  el.innerHTML = `<div class="c-dash"><div class="c-dash__header"><div><div class="c-dash__title">Analytics</div><div class="c-dash__sub">Support metrics</div></div></div><div class="c-dash__grid"><div class="c-dash__card"><div class="c-dash__card-label">Tickets Solved</div><div class="c-dash__card-value">${solved}</div></div><div class="c-dash__card"><div class="c-dash__card-label">Avg Response Time</div><div class="c-dash__card-value">${avgResp}m</div></div><div class="c-dash__card"><div class="c-dash__card-label">Open Tickets</div><div class="c-dash__card-value">${tickets.filter(t=>t.status==='open').length}</div></div><div class="c-dash__card"><div class="c-dash__card-label">RTC Coverage</div><div class="c-dash__card-value">${tickets.length ? Math.round(tickets.filter(t=>t.rtc).length/tickets.length*100) : 0}%</div></div></div></div>`;
+}
+function openNewTicketModal() {
+  const overlay = document.createElement('div');
+  overlay.className = 'c-modal-overlay'; overlay.style.display = 'flex';
+  overlay.innerHTML = `<div class="c-modal"><div class="c-modal__header"><div class="c-modal__title">New Ticket</div><button class="c-modal__close" onclick="this.closest('.c-modal-overlay').remove()">✕</button></div><div class="c-modal__body"><div style="display:flex;flex-direction:column;gap:10px"><input id="nt_customer" placeholder="Customer name" class="pf-input"><input id="nt_subject" placeholder="Subject" class="pf-input"><select id="nt_priority" class="pf-select"><option>Low</option><option selected>Normal</option><option>High</option><option>Urgent</option></select><select id="nt_source" class="pf-select"><option>Manual</option><option selected>Email</option><option>Chat</option><option>Phone</option></select><textarea id="nt_msg" class="pf-textarea" rows="3" placeholder="Initial message"></textarea></div></div><div class="c-modal__footer"><button class="c-btn" onclick="this.closest('.c-modal-overlay').remove()">Cancel</button><button class="c-btn c-btn--primary" onclick="submitNewTicket(this)">Create Ticket</button></div></div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  document.addEventListener('keydown', function esc(e) { if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', esc); } });
+}
+function submitNewTicket(btn) {
+  const d = db();
+  const ticket = { id: genId('TKT', 'ticket'), subject: document.getElementById('nt_subject').value || '(no subject)', customer: document.getElementById('nt_customer').value, agent: '—', status: 'open', priority: document.getElementById('nt_priority').value, age: '0m', source: document.getElementById('nt_source').value, rtc: '', messages: document.getElementById('nt_msg').value ? [{ from: 'customer', name: document.getElementById('nt_customer').value || 'Customer', avatar: '#7c3aed', text: document.getElementById('nt_msg').value, time: new Date().toLocaleTimeString() }] : [] };
+  (d.tickets = d.tickets || []).push(ticket);
+  dbSave(d); btn.closest('.c-modal-overlay').remove(); navSupport('tickets'); showToast('success', 'Ticket #' + ticket.id + ' created');
+}
+
+// ====== Messages ======
+function renderMessagesView() {
+  const d = db(); const users = d.users.filter(u => u.id !== currentUser.id && u.id !== '1101');
+  const msgs = d.messages || [];
+  document.getElementById('viewMessages').innerHTML = `<div style="display:flex;height:100%;width:100%"><div class="c-conv" style="width:240px;flex-shrink:0;border-right:1px solid var(--pf-border);background:var(--pf-bg-sidebar);display:flex;flex-direction:column"><div class="c-ticket-list__toolbar"><span style="font-size:13px;font-weight:600">Team</span></div><div class="c-ticket-list__scroll">${users.map(u => `<div class="c-ticket ${u.id===activeChatPerson?'is-selected':''}" onclick="openChat('${u.id}')"><div style="display:flex;align-items:center;gap:8px;width:100%"><span style="width:8px;height:8px;border-radius:50%;background:var(--pf-success)"></span><span style="font-size:13px">${u.name}</span></div></div>`).join('')}</div></div><div class="c-conv">${activeChatPerson ? (() => { const u = d.users.find(x => x.id === activeChatPerson); return `<div class="c-conv__header"><div class="c-conv__subject">${u?.name||'Chat'}</div></div><div class="c-conv__scroll">${msgs.filter(m => (m.from === currentUser.id && m.to === activeChatPerson) || (m.from === activeChatPerson && m.to === currentUser.id)).map(m => `<div class="c-msg ${m.from===currentUser.id?'is-agent':'is-customer'}"><div class="c-msg__body"><div class="c-msg__bubble">${m.text}</div><div class="c-msg__time">${m.ts}</div></div></div>`).join('')||'<div style="text-align:center;color:var(--pf-text-muted);padding:20px">No messages yet</div>'}</div><div class="c-reply" style="display:flex;gap:12px"><input class="pf-input" id="msgInput" placeholder="Type a message..." onkeydown="if(event.key==='Enter')sendChatMsg()"><button class="c-btn c-btn--primary" onclick="sendChatMsg()">Send</button></div>`; })() : '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--pf-text-muted)">Select a colleague</div>'}</div></div>`;
+}
+function openChat(id) { activeChatPerson = id; renderMessagesView(); }
+function sendChatMsg() {
+  const inp = document.getElementById('msgInput'); if (!inp || !inp.value.trim()) return;
+  const d = db();
+  (d.messages = d.messages || []).push({ id: genId('M','order'), from: currentUser.id, to: activeChatPerson, text: inp.value.trim(), ts: new Date().toLocaleTimeString() });
+  inp.value = ''; dbSave(d); renderMessagesView(); showToast('success', 'Sent');
+}
+
+// ====== Feedback ======
+function renderFeedbackView() {
+  const d = db(); const fb = d.feedbacks || [];
+  document.getElementById('viewFeedback').innerHTML = `<div class="c-dash"><div class="c-dash__header"><div><div class="c-dash__title">Client Feedback</div></div><button class="c-btn c-btn--primary" onclick="openFeedbackModal()">+ Log Feedback</button></div><div class="c-dash__panel">${fb.length ? fb.map(f => `<div class="queue-item"><div><span class="badge bg-${f.type==='Praise'?'success':f.type==='Complaint'?'danger':f.type==='Concern'?'warning':'info'}">${f.type}</span> <strong>${f.client}</strong> ${f.ref?`(${f.ref})`:''} — ${f.details}</div><div style="display:flex;gap:6px;align-items:center"><span style="font-size:11px;color:var(--pf-text-muted)">${f.loggedBy} • ${f.ts}</span><button class="c-btn c-btn--sm" onclick="editFeedback('${f.id}')">✏️</button><button class="c-btn c-btn--sm c-btn--danger" onclick="deleteFeedback('${f.id}')">🗑️</button></div></div>`).join('') : '<div style="padding:20px;text-align:center;color:var(--pf-text-muted)">No feedback logged</div>'}</div></div>`;
+}
+function openFeedbackModal() {
+  const overlay = document.createElement('div');
+  overlay.className = 'c-modal-overlay'; overlay.style.display = 'flex';
+  overlay.innerHTML = `<div class="c-modal"><div class="c-modal__header"><div class="c-modal__title">Log Client Feedback</div><button class="c-modal__close" onclick="this.closest('.c-modal-overlay').remove()">✕</button></div><div class="c-modal__body"><div class="row2"><div><label class="modal-label">Client</label><input class="pf-input" id="f_client"></div><div><label class="modal-label">Type</label><select class="pf-select" id="f_type"><option>Feedback</option><option>Concern</option><option>Complaint</option><option>Praise</option></select></div></div><label class="modal-label">Reference</label><input class="pf-input" id="f_ref" placeholder="Order/Ticket ID"><label class="modal-label">Details</label><textarea class="pf-textarea" id="f_details" rows="3"></textarea></div><div class="c-modal__footer"><button class="c-btn" onclick="this.closest('.c-modal-overlay').remove()">Cancel</button><button class="c-btn c-btn--primary" onclick="submitFeedback(this)">Save</button></div></div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+}
+function submitFeedback(btn) {
+  const d = db();
+  (d.feedbacks = d.feedbacks || []).push({ id: genId('F','feedback'), client: document.getElementById('f_client').value, type: document.getElementById('f_type').value, ref: document.getElementById('f_ref').value, details: document.getElementById('f_details').value, loggedBy: currentUser.name, ts: new Date().toLocaleDateString() });
+  dbSave(d); btn.closest('.c-modal-overlay').remove(); renderFeedbackView(); showToast('success', 'Feedback logged');
+}
+function editFeedback(id) {
+  const d = db(); const f = d.feedbacks.find(x => x.id === id); if (!f) return;
+  openEditModal('Edit Feedback', [
+    { key: 'client', label: 'Client', value: f.client },
+    { key: 'type', label: 'Type', type: 'select', value: f.type, options: ['Feedback','Concern','Complaint','Praise'] },
+    { key: 'details', label: 'Details', type: 'textarea', value: f.details },
+  ], vals => { Object.assign(f, vals); dbSave(d); renderFeedbackView(); showToast('success', 'Updated'); });
+}
+function deleteFeedback(id) { requestDelete('Feedback', 'Feedback entry', id, () => { const d = db(); d.feedbacks = (d.feedbacks || []).filter(x => x.id !== id); dbSave(d); renderFeedbackView(); }); }
+
+// ====== User Management (Admin) ======
+function renderUserManagement() {
+  const d = db();
+  document.getElementById('viewUserManagement').innerHTML = `<div class="c-dash"><div class="c-dash__header"><div><div class="c-dash__title">User Management</div><div class="c-dash__sub">Admin ID: 1101</div></div><button class="c-btn c-btn--primary" onclick="openAddUserModal()">+ Add User</button></div><div class="c-dash__panel"><table><thead><tr><th>ID</th><th>Name</th><th>Username</th><th>Role</th><th>Pass Changed</th><th>Actions</th></tr></thead><tbody>${d.users.map(u => `<tr><td style="font-family:var(--pf-mono)">${u.id}</td><td>${u.name}</td><td>${u.username}</td><td><span class="badge bg-normal">${u.role}</span></td><td>${u.passChanged?'✓':'<span style="color:var(--pf-warning)">Default</span>'}</td><td>${u.id!=='1101'?`<button class="c-btn c-btn--sm" onclick="editUser('${u.id}')">✏️</button> <button class="c-btn c-btn--sm" onclick="resetUserPass('${u.id}')">🔑</button> <button class="c-btn c-btn--sm c-btn--danger" onclick="deleteUser('${u.id}')">🗑️</button>`:'<span style="color:var(--pf-text-muted);font-size:11px">System Admin</span>'}</td></tr>`).join('')}</tbody></table></div></div>`;
+}
+function openAddUserModal() {
+  const overlay = document.createElement('div');
+  overlay.className = 'c-modal-overlay'; overlay.style.display = 'flex';
+  overlay.innerHTML = `<div class="c-modal"><div class="c-modal__header"><div class="c-modal__title">Add User</div><button class="c-modal__close" onclick="this.closest('.c-modal-overlay').remove()">✕</button></div><div class="c-modal__body"><div style="display:flex;flex-direction:column;gap:10px"><input id="au_name" class="pf-input" placeholder="Full Name"><input id="au_email" class="pf-input" placeholder="Email / Username"><select id="au_role" class="pf-select"><option>Support Desk</option><option>Workflow Coordinator</option><option>Upload Manager</option><option>Download Manager</option></select></div></div><div class="c-modal__footer"><button class="c-btn" onclick="this.closest('.c-modal-overlay').remove()">Cancel</button><button class="c-btn c-btn--primary" onclick="submitAddUser(this)">Add User</button></div></div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+}
+function submitAddUser(btn) {
+  const name = document.getElementById('au_name').value.trim(), email = document.getElementById('au_email').value.trim(), role = document.getElementById('au_role').value;
+  if (!name || !email) { showToast('warning', 'Name and email required'); return; }
+  const d = db();
+  if (d.users.find(x => x.username === email)) { showToast('warning', 'User exists'); return; }
+  d.users.push({ id: genId('U','user'), username: email, password: 'pixofix', name, role, roles: [role], passChanged: false, createdBy: currentUser.id });
+  dbSave(d); btn.closest('.c-modal-overlay').remove(); renderUserManagement(); showToast('success', 'User added (default pass: pixofix)');
+}
+function editUser(id) {
+  const d = db(); const u = d.users.find(x => x.id === id); if (!u) return;
+  openEditModal('Edit User', [
+    { key: 'name', label: 'Name', value: u.name },
+    { key: 'role', label: 'Role', type: 'select', value: u.role, options: ['Support Desk','Workflow Coordinator','Upload Manager','Download Manager','Super Admin'] },
+  ], vals => { u.name = vals.name; u.role = vals.role; u.roles = [vals.role]; if (vals.role === 'Super Admin') u.roles = ['Super Admin','Support Desk','Workflow Coordinator','Upload Manager','Download Manager']; dbSave(d); renderUserManagement(); showToast('success', 'Updated'); });
+}
+function resetUserPass(id) {
+  const d = db(); const u = d.users.find(x => x.id === id);
+  if (u) { u.password = 'pixofix'; u.passChanged = false; dbSave(d); renderUserManagement(); showToast('success', 'Password reset to: pixofix'); }
+}
+function deleteUser(id) {
+  if (id === '1101') { showToast('warning', 'Cannot delete primary admin'); return; }
+  const d = db(); d.users = d.users.filter(x => x.id !== id);
+  dbSave(d); renderUserManagement(); showToast('success', 'User deleted');
+}
+
+// ====== Assign Modal ======
+function openAssignModal() {
+  const d = db();
+  document.getElementById('a_employee').innerHTML = d.users.filter(u => u.id !== '1101').map(u => `<option value="${u.name}">${u.name}</option>`).join('');
+  document.getElementById('assignModalOverlay').classList.add('active');
+}
+function closeAssignModal() { document.getElementById('assignModalOverlay').classList.remove('active'); }
+document.querySelector('#assignModalOverlay .c-modal__close')?.addEventListener('click', closeAssignModal);
+// fix assign modal placeholder
+document.getElementById('assignModalOverlay').innerHTML = `<div class="c-modal"><div class="c-modal__header"><div class="c-modal__title">Assign New Task</div><button class="c-modal__close" onclick="closeAssignModal()">✕</button></div><div class="c-modal__body"><div class="row2"><div><label class="modal-label">Type</label><select class="pf-select" id="a_type" onchange="updateAssignEmp()"><option>Upload</option><option>Download</option></select></div><div><label class="modal-label">Assign To</label><select class="pf-select" id="a_employee"></select></div></div><label class="modal-label">Client</label><select class="pf-select" id="a_client"><option value="">Select</option><option>CBI</option><option>FSA</option><option>YETI</option><option>Box Photographic</option><option>Other</option></select><div class="row2"><div><label class="modal-label">Order Ref</label><input class="pf-input" id="a_style"></div><div><label class="modal-label">Image Qty</label><input class="pf-input" id="a_qty" type="number" min="1"></div></div><div class="row2"><div><label class="modal-label">ETA</label><input class="pf-input" id="a_eta" type="date"></div><div><label class="modal-label">Internal ETA</label><input class="pf-input" id="a_internalEta" type="date"></div></div><label class="modal-label">Instructions</label><textarea class="pf-textarea" id="a_instructions" rows="2"></textarea><div style="margin-top:12px;display:flex;align-items:center;gap:8px"><input type="checkbox" id="a_refs" style="accent-color:var(--pf-primary)"> <span style="font-size:12px;color:var(--pf-text-secondary)">Reference images provided</span></div></div><div class="c-modal__footer"><button class="c-btn" onclick="closeAssignModal()">Cancel</button><button class="c-btn c-btn--primary" onclick="submitAssign()">Assign</button></div></div>`;
+function updateAssignEmp() {
+  const d = db();
+  document.getElementById('a_employee').innerHTML = d.users.filter(u => u.id !== '1101').map(u => `<option value="${u.name}">${u.name}</option>`).join('');
+}
+function submitAssign() {
+  const d = db();
+  const o = { id: genId('O','order'), client: document.getElementById('a_client').value, style: document.getElementById('a_style').value, type: document.getElementById('a_type').value, qty: parseInt(document.getElementById('a_qty').value)||0, status: 'Assigned', assignedTo: document.getElementById('a_employee').value, priority: 'Normal', eta: document.getElementById('a_eta').value, instructions: document.getElementById('a_instructions').value, refs: document.getElementById('a_refs').checked };
+  (d.orders = d.orders || []).push(o); dbSave(d); closeAssignModal(); renderCoordinatorView(); showToast('success', 'Task assigned');
+}
+
+// ====== Init ======
+function init() {
+  const d = db();
+  if (d.tickets.length === 0) {
+    d.tickets = [
+      { id: genId('TKT','ticket'), subject: 'Unable to access billing dashboard', customer: 'Sarah Chen', agent: '—', status: 'open', priority: 'urgent', age: '12m', messages: [{ from: 'customer', name: 'Sarah Chen', avatar: '#7c3aed', text: 'I keep getting a 403 error on the billing dashboard.', time: '10:23 AM' }] },
+      { id: genId('TKT','ticket'), subject: 'Enterprise plan pricing inquiry', customer: 'Michael Torres', agent: '—', status: 'open', priority: 'high', age: '28m' },
+      { id: genId('TKT','ticket'), subject: 'Salesforce integration issue', customer: 'Emily Watson', agent: '—', status: 'open', priority: 'high', age: '45m' },
+      { id: genId('TKT','ticket'), subject: 'Password reset not received', customer: 'David Kim', agent: 'You', status: 'pending', priority: 'normal', age: '1h' },
+    ];
+    d.orders = [
+      { id: genId('O','order'), client: 'CBI', style: 'SS24-001', type: 'Upload', qty: 45, status: 'Assigned', assignedTo: 'Admin', priority: 'High', eta: new Date(Date.now()+86400000*2).toISOString().slice(0,10) },
+      { id: genId('O','order'), client: 'FSA', style: 'FW24-022', type: 'Download', qty: 120, status: 'Assigned', assignedTo: 'Admin', priority: 'Normal', eta: new Date(Date.now()+86400000*5).toISOString().slice(0,10) },
+    ];
+    dbSave(d);
+  }
+  updateClocks();
+}
+init();
+</script>
+</body>
+</html>
