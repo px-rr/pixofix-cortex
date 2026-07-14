@@ -355,33 +355,36 @@ async function fetchSingleAccount(account) {
     await client.connect();
     const lock = await client.getMailboxLock('INBOX');
     try {
-      for await (const msg of client.fetch('1:*', { envelope: true, source: true, flags: true })) {
-        let parsed = null;
-        try { parsed = await simpleParser(msg.source); } catch {}
-        const fromRaw = parsed?.from?.text || msg.envelope?.from?.[0]?.address || 'Unknown';
-        const subject = parsed?.subject || msg.envelope?.subject || '(No subject)';
-        const bodyText = parsed?.text || '';
-        const date = parsed?.date?.toISOString() || (msg.envelope?.date ? new Date(msg.envelope.date).toISOString() : new Date().toISOString());
-        emails.push({
-          id: msg.uid, subject, from: fromRaw, to: parsed?.to?.text || '', date, text: bodyText.substring(0, 5000), seen: msg.flags?.includes('\\Seen') || false, account: account.label
-        });
-        const data = await db();
-        const dedup = (data.emailLogs || []).some(e => e.subject === subject && e.fromAddr === fromRaw);
-        if (dedup) continue;
-        if (!data.emailLogs) data.emailLogs = [];
-        const logId = uuidv4();
-        const now = new Date().toISOString();
-        const maskedFrom = maskEmail(fromRaw);
-        data.emailLogs.push({ id: logId, fromAddr: fromRaw, fromMasked: maskedFrom, subject, body: bodyText.substring(0, 2000), receivedAt: now, processedAs: '', account: account.label });
-        const ticketId = 'T' + await nextId('ticket');
-        if (!data.tickets) data.tickets = [];
-        data.tickets.push({ id: ticketId, subject, client: maskedFrom, status: 'Open', priority: 'Medium', description: bodyText.substring(0, 2000), category: 'Email', agent: '', createdBy: 'system', createdAt: now, updatedAt: now, rtc: '', summary: '' });
-        const log = data.emailLogs.find(e => e.id === logId);
-        if (log) log.processedAs = ticketId;
-        await dbSave(data);
-        const slackCfg = await getSlackConfig();
-        if (slackCfg.enabled && slackCfg.webhookUrl) notifySlack(`📧 New ticket ${ticketId} from ${maskedFrom}: ${subject}`);
-        count++;
+      const allUids = await client.search({ uid: '1:*' });
+      for (const uid of allUids.slice(-20)) {
+        for await (const msg of client.fetch(uid, { envelope: true, source: true, flags: true })) {
+          let parsed = null;
+          try { parsed = await simpleParser(msg.source); } catch {}
+          const fromRaw = parsed?.from?.text || msg.envelope?.from?.[0]?.address || 'Unknown';
+          const subject = parsed?.subject || msg.envelope?.subject || '(No subject)';
+          const bodyText = parsed?.text || '';
+          const date = parsed?.date?.toISOString() || (msg.envelope?.date ? new Date(msg.envelope.date).toISOString() : new Date().toISOString());
+          emails.push({
+            id: msg.uid, subject, from: fromRaw, to: parsed?.to?.text || '', date, text: bodyText.substring(0, 5000), seen: msg.flags?.includes('\\Seen') || false, account: account.label
+          });
+          const data = await db();
+          const dedup = (data.emailLogs || []).some(e => e.subject === subject && e.fromAddr === fromRaw);
+          if (dedup) continue;
+          if (!data.emailLogs) data.emailLogs = [];
+          const logId = uuidv4();
+          const now = new Date().toISOString();
+          const maskedFrom = maskEmail(fromRaw);
+          data.emailLogs.push({ id: logId, fromAddr: fromRaw, fromMasked: maskedFrom, subject, body: bodyText.substring(0, 2000), receivedAt: now, processedAs: '', account: account.label });
+          const ticketId = 'T' + await nextId('ticket');
+          if (!data.tickets) data.tickets = [];
+          data.tickets.push({ id: ticketId, subject, client: maskedFrom, status: 'Open', priority: 'Medium', description: bodyText.substring(0, 2000), category: 'Email', agent: '', createdBy: 'system', createdAt: now, updatedAt: now, rtc: '', summary: '' });
+          const log = data.emailLogs.find(e => e.id === logId);
+          if (log) log.processedAs = ticketId;
+          await dbSave(data);
+          const slackCfg = await getSlackConfig();
+          if (slackCfg.enabled && slackCfg.webhookUrl) notifySlack(`📧 New ticket ${ticketId} from ${maskedFrom}: ${subject}`);
+          count++;
+        }
       }
     } finally { lock.release(); }
     await client.logout();
