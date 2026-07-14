@@ -1,6 +1,7 @@
 {
   "version": 2,
   "buildCommand": null,
-  "installCommand": "npm install imapflow mailparser",
-  "framework": null
+  "installCommand": null,
+  "framework": null,
+  "rewrites": [{ "source": "/(.*)", "destination": "/api/index" }]
 }
