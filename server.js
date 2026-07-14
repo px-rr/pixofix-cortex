@@ -347,32 +347,40 @@ app.post('/api/auto-email-config', async (req, res) => {
 });
 
 async function fetchSingleAccount(account) {
-  if (!ImapFlow || !simpleParser) return 0;
+  if (!ImapFlow || !simpleParser) return { count: 0, emails: [] };
   let count = 0;
+  const emails = [];
   try {
-    const client = new ImapFlow({ host: account.host, port: account.port || 993, secure: true, auth: { user: account.user, pass: account.pass }, logger: false });
+    const client = new ImapFlow({ host: account.host, port: account.port || 993, secure: true, auth: { user: account.user, pass: account.pass }, logger: false, tls: { rejectUnauthorized: false } });
     await client.connect();
     const lock = await client.getMailboxLock('INBOX');
     try {
-      for await (const msg of client.fetch('1:10', { envelope: true, source: true })) {
-        const parsed = await simpleParser(msg.source);
+      for await (const msg of client.fetch('1:30', { envelope: true, source: true, flags: true })) {
+        let parsed = null;
+        try { parsed = await simpleParser(msg.source); } catch {}
+        const fromRaw = parsed?.from?.text || msg.envelope?.from?.[0]?.address || 'Unknown';
+        const subject = parsed?.subject || msg.envelope?.subject || '(No subject)';
+        const bodyText = parsed?.text || '';
+        const date = parsed?.date?.toISOString() || (msg.envelope?.date ? new Date(msg.envelope.date).toISOString() : new Date().toISOString());
+        emails.push({
+          id: msg.uid, subject, from: fromRaw, to: parsed?.to?.text || '', date, text: bodyText.substring(0, 5000), seen: msg.flags?.includes('\\Seen') || false, account: account.label
+        });
         const data = await db();
-        const fromRaw = parsed.from?.text || '';
-        const dedup = (data.emailLogs || []).some(e => e.subject === parsed.subject && e.fromAddr === fromRaw);
+        const dedup = (data.emailLogs || []).some(e => e.subject === subject && e.fromAddr === fromRaw);
         if (dedup) continue;
         if (!data.emailLogs) data.emailLogs = [];
         const logId = uuidv4();
         const now = new Date().toISOString();
         const maskedFrom = maskEmail(fromRaw);
-        data.emailLogs.push({ id: logId, fromAddr: fromRaw, fromMasked: maskedFrom, subject: parsed.subject || '', body: (parsed.text || '').substring(0, 2000), receivedAt: now, processedAs: '', account: account.label });
+        data.emailLogs.push({ id: logId, fromAddr: fromRaw, fromMasked: maskedFrom, subject, body: bodyText.substring(0, 2000), receivedAt: now, processedAs: '', account: account.label });
         const ticketId = 'T' + await nextId('ticket');
         if (!data.tickets) data.tickets = [];
-        data.tickets.push({ id: ticketId, subject: parsed.subject || '(No subject)', client: maskedFrom, status: 'Open', priority: 'Medium', description: (parsed.text || '').substring(0, 2000), category: 'Email', agent: '', createdBy: 'system', createdAt: now, updatedAt: now, rtc: '', summary: '' });
+        data.tickets.push({ id: ticketId, subject, client: maskedFrom, status: 'Open', priority: 'Medium', description: bodyText.substring(0, 2000), category: 'Email', agent: '', createdBy: 'system', createdAt: now, updatedAt: now, rtc: '', summary: '' });
         const log = data.emailLogs.find(e => e.id === logId);
         if (log) log.processedAs = ticketId;
         await dbSave(data);
         const slackCfg = await getSlackConfig();
-        if (slackCfg.enabled && slackCfg.webhookUrl) notifySlack(`📧 New ticket ${ticketId} from ${maskedFrom}: ${parsed.subject || '(No subject)'}`);
+        if (slackCfg.enabled && slackCfg.webhookUrl) notifySlack(`📧 New ticket ${ticketId} from ${maskedFrom}: ${subject}`);
         count++;
       }
     } finally { lock.release(); }
@@ -380,7 +388,7 @@ async function fetchSingleAccount(account) {
   } catch (err) {
     console.error(`IMAP error for ${account.label}:`, err.message);
   }
-  return count;
+  return { count, emails };
 }
 
 async function pollAllAccounts() {
@@ -407,15 +415,24 @@ function restartAutoEmail() {
 }
 
 app.post('/api/fetch-emails', async (req, res) => {
-  const accounts = await getEmailAccounts();
+  let accounts = await getEmailAccounts();
+  // Support inline credentials from request body (for Vercel without DB persistence)
+  if (req.body.accounts && Array.isArray(req.body.accounts)) {
+    accounts = req.body.accounts;
+  } else if (req.body.user && req.body.pass) {
+    accounts = [{ id: 'inline', label: req.body.user, host: req.body.host || 'imap.gmail.com', port: parseInt(req.body.port) || 993, user: req.body.user, pass: req.body.pass }];
+  }
   if (!accounts.length || !ImapFlow) {
-    return res.status(400).json({ error: !ImapFlow ? 'IMAP modules not installed' : 'No email accounts configured. Add one via POST /api/imap-accounts', simulated: true });
+    return res.status(400).json({ error: !ImapFlow ? 'IMAP modules not installed' : 'No email accounts configured. POST body with { user, pass, host } or use POST /api/imap-accounts', simulated: true });
   }
   let total = 0;
+  const fetchedEmails = [];
   for (const account of accounts) {
-    total += await fetchSingleAccount(account);
+    const result = await fetchSingleAccount(account);
+    total += result.count || 0;
+    if (result.emails) fetchedEmails.push(...result.emails);
   }
-  res.json({ ok: true, fetched: total });
+  res.json({ ok: true, fetched: total, count: total, emails: fetchedEmails });
 });
 
 app.get('/api/email-logs', async (req, res) => {
