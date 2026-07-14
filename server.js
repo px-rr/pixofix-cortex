@@ -351,14 +351,25 @@ async function fetchSingleAccount(account) {
   let count = 0;
   const emails = [];
   let client = null;
+  let logs = [];
   try {
     client = new ImapFlow({ host: account.host, port: account.port || 993, secure: true, auth: { user: account.user, pass: account.pass }, logger: false, tls: { rejectUnauthorized: false } });
     await client.connect();
+    logs.push('connected');
     const lock = await client.getMailboxLock('INBOX');
+    logs.push('got lock');
     try {
-      let i = 0;
-      for await (const msg of client.fetch('UNSEEN', { envelope: true, source: true, flags: true })) {
-        if (++i > 20) break;
+      const uids = await client.search({ unseen: true });
+      logs.push(`search unseen: ${uids.length} uids`);
+      if (uids.length > 20) uids.length = 20;
+      let fetchRange = uids;
+      if (fetchRange.length === 0) {
+        const allUids = await client.search({ all: true });
+        logs.push(`search all: ${allUids.length} uids`);
+        if (allUids.length > 10) allUids.length = 10;
+        fetchRange = allUids;
+      }
+      for await (const msg of client.fetch(fetchRange, { envelope: true, source: true, flags: true })) {
         let parsed = null;
         try { parsed = await simpleParser(msg.source); } catch {}
         const fromRaw = parsed?.from?.text || msg.envelope?.from?.[0]?.address || 'Unknown';
@@ -386,12 +397,12 @@ async function fetchSingleAccount(account) {
     if (client) await client.logout();
   } catch (err) {
     const msg = err?.message || 'Unknown error';
-    const stack = (err?.stack || '').substring(0, 300);
+    const stack = (err?.stack || '').substring(0, 500);
     console.error(`IMAP error for ${account.label}: ${msg}`);
     if (client) try { await client.logout(); } catch {}
-    return { count: 0, emails: [], error: msg, debug: stack };
+    return { count: 0, emails: [], error: msg, debug: stack, searchLog: logs };
   }
-  return { count, emails };
+  return { count, emails, searchLog: logs };
 }
 
 async function pollAllAccounts() {
