@@ -390,8 +390,9 @@ async function fetchSingleAccount(account) {
     await client.logout();
   } catch (err) {
     console.error(`IMAP error for ${account.label}:`, err.message);
+    return { count: 0, emails: [], error: err.message };
   }
-  return { count, emails };
+  return { count, emails, error: null };
 }
 
 async function pollAllAccounts() {
@@ -419,23 +420,24 @@ function restartAutoEmail() {
 
 app.post('/api/fetch-emails', async (req, res) => {
   let accounts = await getEmailAccounts();
-  // Support inline credentials from request body (for Vercel without DB persistence)
   if (req.body.accounts && Array.isArray(req.body.accounts)) {
     accounts = req.body.accounts;
   } else if (req.body.user && req.body.pass) {
     accounts = [{ id: 'inline', label: req.body.user, host: req.body.host || 'imap.gmail.com', port: parseInt(req.body.port) || 993, user: req.body.user, pass: req.body.pass }];
   }
   if (!accounts.length || !ImapFlow) {
-    return res.status(400).json({ error: !ImapFlow ? 'IMAP modules not installed' : 'No email accounts configured. POST body with { user, pass, host } or use POST /api/imap-accounts', simulated: true });
+    return res.status(400).json({ error: !ImapFlow ? 'IMAP modules not installed' : 'No email accounts configured' });
   }
   let total = 0;
   const fetchedEmails = [];
+  const debug = [];
   for (const account of accounts) {
     const result = await fetchSingleAccount(account);
     total += result.count || 0;
     if (result.emails) fetchedEmails.push(...result.emails);
+    debug.push({ account: account.label, count: result.count, emails: (result.emails||[]).length, error: result.error });
   }
-  res.json({ ok: true, fetched: total, count: total, emails: fetchedEmails });
+  res.json({ ok: true, fetched: total, emails: fetchedEmails, debug });
 });
 
 app.get('/api/email-logs', async (req, res) => {
