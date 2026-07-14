@@ -5,8 +5,26 @@
   "dependencies": {
     "cors": "^2.8.6",
     "express": "^5.2.1",
-    "imapflow": "^1.4.7",
+    "imap": "^0.8.19",
     "mailparser": "^3.9.14",
     "uuid": "^9.0.1"
-  }
+  },
+  "main": "server.js",
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/px-rr/pixofix-cortex.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/px-rr/pixofix-cortex/issues"
+  },
+  "homepage": "https://github.com/px-rr/pixofix-cortex#readme"
 }

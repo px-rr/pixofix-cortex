@@ -6,10 +6,8 @@ const fs = require('fs');
 const https = require('https');
 const http = require('http');
 
-let ImapFlow, simpleParser;
-try { ImapFlow = require('imapflow').ImapFlow; simpleParser = require('mailparser').simpleParser; } catch (e) {
-  console.warn('IMAP/mailparser not available – email fetch disabled. Install with: npm install imapflow mailparser');
-}
+const Imap = require('imap');
+const { simpleParser } = require('mailparser');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -346,63 +344,80 @@ app.post('/api/auto-email-config', async (req, res) => {
   res.json({ ok: true });
 });
 
-async function fetchSingleAccount(account) {
-  if (!ImapFlow || !simpleParser) return { count: 0, emails: [] };
-  let count = 0;
-  const emails = [];
-  let client = null;
-  let logs = [];
-  try {
-    client = new ImapFlow({ host: account.host, port: account.port || 993, secure: true, auth: { user: account.user, pass: account.pass }, logger: false, tls: { rejectUnauthorized: false } });
-    await client.connect();
-    logs.push('connected');
-    const lock = await client.getMailboxLock('INBOX');
-    logs.push('got lock');
-    try {
-      const uids = await client.search({ unseen: true });
-      logs.push(`search unseen: ${uids.length} uids`);
-      if (uids.length > 20) uids.length = 20;
-      let fetchRange = uids;
-      if (fetchRange.length === 0) {
-        const allUids = await client.search({ all: true });
-        logs.push(`search all: ${allUids.length} uids`);
-        if (allUids.length > 10) allUids.length = 10;
-        fetchRange = allUids;
-      }
-      for await (const msg of client.fetch(fetchRange, { envelope: true, source: true, flags: true })) {
-        let parsed = null;
-        try { parsed = await simpleParser(msg.source); } catch {}
-        const fromRaw = parsed?.from?.text || msg.envelope?.from?.[0]?.address || 'Unknown';
-        const subject = parsed?.subject || msg.envelope?.subject || '(No subject)';
-        const bodyText = parsed?.text || '';
-        const date = parsed?.date?.toISOString() || (msg.envelope?.date ? new Date(msg.envelope.date).toISOString() : new Date().toISOString());
-        emails.push({ id: msg.uid, subject, from: fromRaw, to: parsed?.to?.text || '', date, text: bodyText.substring(0, 5000), seen: msg.flags?.includes('\\Seen') || false, account: account.label });
-        const data = await db();
-        const dedup = (data.emailLogs || []).some(e => e.subject === subject && e.fromAddr === fromRaw);
-        if (dedup) continue;
-        if (!data.emailLogs) data.emailLogs = [];
-        const logId = uuidv4();
-        const now = new Date().toISOString();
-        const maskedFrom = maskEmail(fromRaw);
-        data.emailLogs.push({ id: logId, fromAddr: fromRaw, fromMasked: maskedFrom, subject, body: bodyText.substring(0, 2000), receivedAt: now, processedAs: '', account: account.label });
-        const ticketId = 'T' + await nextId('ticket');
-        if (!data.tickets) data.tickets = [];
-        data.tickets.push({ id: ticketId, subject, client: maskedFrom, status: 'Open', priority: 'Medium', description: bodyText.substring(0, 2000), category: 'Email', agent: '', createdBy: 'system', createdAt: now, updatedAt: now, rtc: '', summary: '' });
-        const log = data.emailLogs.find(e => e.id === logId);
-        if (log) log.processedAs = ticketId;
-        await dbSave(data);
+function fetchSingleAccount(account) {
+  return new Promise((resolve) => {
+    const emails = [];
+    let count = 0;
+    const imap = new Imap({ user: account.user, password: account.pass, host: account.host, port: account.port || 993, tls: true, tlsOptions: { rejectUnauthorized: false } });
+    imap.once('error', (err) => resolve({ count: 0, emails: [], error: err.message }));
+    imap.once('end', () => {});
+    imap.once('ready', () => {
+      imap.openBox('INBOX', false, (err, box) => {
+        if (err) { imap.end(); return resolve({ count: 0, emails: [], error: err.message }); }
+        imap.search(['UNSEEN'], (err, results) => {
+          if (err) { imap.end(); return resolve({ count: 0, emails: [], error: err.message }); }
+          if (!results || results.length === 0) {
+            imap.search(['ALL'], (err2, all) => {
+              if (err2) { imap.end(); return resolve({ count: 0, emails: [], error: err2.message }); }
+              const uids = (all || []).slice(-10);
+              if (!uids.length) { imap.end(); return resolve({ count: 0, emails: [] }); }
+              fetchMessages(imap, uids, emails, count, resolve, account);
+            });
+          } else {
+            const uids = results.slice(-20);
+            fetchMessages(imap, uids, emails, count, resolve, account);
+          }
+        });
+      });
+    });
+    imap.connect();
+  });
+}
+
+function fetchMessages(imap, uids, emails, count, resolve, account) {
+  const f = imap.fetch(uids, { bodies: '', markSeen: false });
+  let buffer = '';
+  let currentMsg = null;
+  f.on('message', (msg) => {
+    buffer = '';
+    msg.on('body', (stream) => {
+      stream.on('data', (chunk) => { buffer += chunk.toString('utf8'); });
+    });
+    msg.once('attributes', (attrs) => {
+      currentMsg = { uid: attrs.uid, flags: attrs.flags || [] };
+    });
+    msg.once('end', async () => {
+      if (!buffer) return;
+      try {
+        const parsed = await simpleParser(buffer);
+        const fromRaw = parsed.from?.text || parsed.from?.value?.[0]?.address || 'Unknown';
+        const subject = parsed.subject || '(No subject)';
+        const bodyText = parsed.text || '';
+        const date = parsed.date?.toISOString() || new Date().toISOString();
         count++;
-      }
-    } finally { lock.release(); }
-    if (client) await client.logout();
-  } catch (err) {
-    const msg = err?.message || 'Unknown error';
-    const stack = (err?.stack || '').substring(0, 500);
-    console.error(`IMAP error for ${account.label}: ${msg}`);
-    if (client) try { await client.logout(); } catch {}
-    return { count: 0, emails: [], error: msg, debug: stack, searchLog: logs };
-  }
-  return { count, emails, searchLog: logs };
+        emails.push({ id: currentMsg?.uid || count, subject, from: fromRaw, to: parsed.to?.text || '', date, text: bodyText.substring(0, 5000), seen: currentMsg?.flags?.includes('\\Seen') || false, account: account.label });
+        (async () => {
+          try {
+            const data = await db();
+            if ((data.emailLogs || []).some(e => e.subject === subject && e.fromAddr === fromRaw)) return;
+            if (!data.emailLogs) data.emailLogs = [];
+            const logId = uuidv4();
+            const now = new Date().toISOString();
+            const maskedFrom = maskEmail(fromRaw);
+            data.emailLogs.push({ id: logId, fromAddr: fromRaw, fromMasked: maskedFrom, subject, body: bodyText.substring(0, 2000), receivedAt: now, processedAs: '', account: account.label });
+            const ticketId = 'T' + await nextId('ticket');
+            if (!data.tickets) data.tickets = [];
+            data.tickets.push({ id: ticketId, subject, client: maskedFrom, status: 'Open', priority: 'Medium', description: bodyText.substring(0, 2000), category: 'Email', agent: '', createdBy: 'system', createdAt: now, updatedAt: now, rtc: '', summary: '' });
+            const log = data.emailLogs.find(e => e.id === logId);
+            if (log) log.processedAs = ticketId;
+            await dbSave(data);
+          } catch (e) {}
+        })();
+      } catch (e) {}
+    });
+  });
+  f.once('error', (err) => { imap.end(); resolve({ count: 0, emails: [], error: err.message }); });
+  f.once('end', () => { imap.end(); resolve({ count, emails }); });
 }
 
 async function pollAllAccounts() {
@@ -410,7 +425,7 @@ async function pollAllAccounts() {
   pollingActive = true;
   try {
     const accounts = await getEmailAccounts();
-    if (!accounts.length || !ImapFlow) return;
+    if (!accounts.length) return;
     for (const account of accounts) {
       await fetchSingleAccount(account);
     }
@@ -435,8 +450,8 @@ app.post('/api/fetch-emails', async (req, res) => {
   } else if (req.body.user && req.body.pass) {
     accounts = [{ id: 'inline', label: req.body.user, host: req.body.host || 'imap.gmail.com', port: parseInt(req.body.port) || 993, user: req.body.user, pass: req.body.pass }];
   }
-  if (!accounts.length || !ImapFlow) {
-    return res.status(400).json({ error: !ImapFlow ? 'IMAP modules not installed' : 'No email accounts configured' });
+  if (!accounts.length) {
+    return res.status(400).json({ error: 'No email accounts configured' });
   }
   let total = 0;
   const fetchedEmails = [];
