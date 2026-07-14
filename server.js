@@ -350,49 +350,46 @@ async function fetchSingleAccount(account) {
   if (!ImapFlow || !simpleParser) return { count: 0, emails: [] };
   let count = 0;
   const emails = [];
+  let client = null;
   try {
-    const client = new ImapFlow({ host: account.host, port: account.port || 993, secure: true, auth: { user: account.user, pass: account.pass }, logger: false, tls: { rejectUnauthorized: false } });
+    client = new ImapFlow({ host: account.host, port: account.port || 993, secure: true, auth: { user: account.user, pass: account.pass }, logger: false, tls: { rejectUnauthorized: false } });
     await client.connect();
     const lock = await client.getMailboxLock('INBOX');
     try {
-      let msgCount = 0;
+      let i = 0;
       for await (const msg of client.fetch('ALL', { envelope: true, source: true, flags: true })) {
-          if (++msgCount > 20) break;
-          let parsed = null;
-          try { parsed = await simpleParser(msg.source); } catch {}
-          const fromRaw = parsed?.from?.text || msg.envelope?.from?.[0]?.address || 'Unknown';
-          const subject = parsed?.subject || msg.envelope?.subject || '(No subject)';
-          const bodyText = parsed?.text || '';
-          const date = parsed?.date?.toISOString() || (msg.envelope?.date ? new Date(msg.envelope.date).toISOString() : new Date().toISOString());
-          emails.push({
-            id: msg.uid, subject, from: fromRaw, to: parsed?.to?.text || '', date, text: bodyText.substring(0, 5000), seen: msg.flags?.includes('\\Seen') || false, account: account.label
-          });
-          const data = await db();
-          const dedup = (data.emailLogs || []).some(e => e.subject === subject && e.fromAddr === fromRaw);
-          if (dedup) continue;
-          if (!data.emailLogs) data.emailLogs = [];
-          const logId = uuidv4();
-          const now = new Date().toISOString();
-          const maskedFrom = maskEmail(fromRaw);
-          data.emailLogs.push({ id: logId, fromAddr: fromRaw, fromMasked: maskedFrom, subject, body: bodyText.substring(0, 2000), receivedAt: now, processedAs: '', account: account.label });
-          const ticketId = 'T' + await nextId('ticket');
-          if (!data.tickets) data.tickets = [];
-          data.tickets.push({ id: ticketId, subject, client: maskedFrom, status: 'Open', priority: 'Medium', description: bodyText.substring(0, 2000), category: 'Email', agent: '', createdBy: 'system', createdAt: now, updatedAt: now, rtc: '', summary: '' });
-          const log = data.emailLogs.find(e => e.id === logId);
-          if (log) log.processedAs = ticketId;
-          await dbSave(data);
-          const slackCfg = await getSlackConfig();
-          if (slackCfg.enabled && slackCfg.webhookUrl) notifySlack(`📧 New ticket ${ticketId} from ${maskedFrom}: ${subject}`);
-          count++;
-        }
+        if (++i > 20) break;
+        let parsed = null;
+        try { parsed = await simpleParser(msg.source); } catch {}
+        const fromRaw = parsed?.from?.text || msg.envelope?.from?.[0]?.address || 'Unknown';
+        const subject = parsed?.subject || msg.envelope?.subject || '(No subject)';
+        const bodyText = parsed?.text || '';
+        const date = parsed?.date?.toISOString() || (msg.envelope?.date ? new Date(msg.envelope.date).toISOString() : new Date().toISOString());
+        emails.push({ id: msg.uid, subject, from: fromRaw, to: parsed?.to?.text || '', date, text: bodyText.substring(0, 5000), seen: msg.flags?.includes('\\Seen') || false, account: account.label });
+        const data = await db();
+        const dedup = (data.emailLogs || []).some(e => e.subject === subject && e.fromAddr === fromRaw);
+        if (dedup) continue;
+        if (!data.emailLogs) data.emailLogs = [];
+        const logId = uuidv4();
+        const now = new Date().toISOString();
+        const maskedFrom = maskEmail(fromRaw);
+        data.emailLogs.push({ id: logId, fromAddr: fromRaw, fromMasked: maskedFrom, subject, body: bodyText.substring(0, 2000), receivedAt: now, processedAs: '', account: account.label });
+        const ticketId = 'T' + await nextId('ticket');
+        if (!data.tickets) data.tickets = [];
+        data.tickets.push({ id: ticketId, subject, client: maskedFrom, status: 'Open', priority: 'Medium', description: bodyText.substring(0, 2000), category: 'Email', agent: '', createdBy: 'system', createdAt: now, updatedAt: now, rtc: '', summary: '' });
+        const log = data.emailLogs.find(e => e.id === logId);
+        if (log) log.processedAs = ticketId;
+        await dbSave(data);
+        count++;
       }
     } finally { lock.release(); }
-    await client.logout();
+    if (client) await client.logout();
   } catch (err) {
     console.error(`IMAP error for ${account.label}:`, err.message);
+    if (client) try { await client.logout(); } catch {}
     return { count: 0, emails: [], error: err.message };
   }
-  return { count, emails, error: null };
+  return { count, emails };
 }
 
 async function pollAllAccounts() {
