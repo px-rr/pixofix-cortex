@@ -359,12 +359,12 @@ function fetchSingleAccount(account) {
           if (!results || results.length === 0) {
             imap.search(['ALL'], (err2, all) => {
               if (err2) { imap.end(); return resolve({ count: 0, emails: [], error: err2.message }); }
-              const uids = (all || []).slice(-10);
+              const uids = (all || []).slice(-5);
               if (!uids.length) { imap.end(); return resolve({ count: 0, emails: [] }); }
               fetchMessages(imap, uids, emails, count, resolve, account);
             });
           } else {
-            const uids = results.slice(-20);
+            const uids = results.slice(-5);
             fetchMessages(imap, uids, emails, count, resolve, account);
           }
         });
