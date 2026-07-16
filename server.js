@@ -6,6 +6,9 @@ const fs = require('fs');
 const https = require('https');
 const http = require('http');
 
+let google = null;
+try { google = require('googleapis').google; } catch (e) {}
+
 const Imap = require('imap');
 const { simpleParser } = require('mailparser');
 
@@ -17,56 +20,145 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ====== Database (JSON File local, Upstash Redis on Vercel) ======
-const USE_UPSTASH = !!process.env.UPSTASH_REDIS_REST_URL;
+// ====== Google Sheets Database ======
+const GOOGLE_SHEET_ID = process.env.GOOGLE_SHEET_ID;
+const GOOGLE_SERVICE_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+const GOOGLE_PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY ? process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n') : null;
+const USE_SHEETS = !!(GOOGLE_SHEET_ID && GOOGLE_SERVICE_EMAIL && GOOGLE_PRIVATE_KEY && google);
+
+const DATA_DIR = '/tmp/pixofix-cortex-data';
+const DB_FILE = path.join(DATA_DIR, 'db.json');
+
+let sheets = null;
+
+const SHEET_TABS = [
+  { key: 'emailLogs', tab: 'Emails', fields: ['id','fromAddr','fromMasked','subject','body','receivedAt','processedAs','account'] },
+  { key: 'tickets', tab: 'Tickets', fields: ['id','subject','client','status','priority','description','category','agent','createdBy','createdAt','updatedAt','rtc','summary'] },
+  { key: 'orders', tab: 'Orders', fields: ['id','client','orderType','description','quantity','eta','status','priority','assignedTo','createdAt','updatedAt'] },
+  { key: 'users', tab: 'Users', fields: ['id','username','password','name','role','roles','passChanged','createdBy'] },
+  { key: 'messages', tab: 'Messages', fields: ['id','fromUser','toUser','text','threadId','createdAt'] },
+  { key: 'feedbacks', tab: 'Feedbacks', fields: ['id','type','message','submittedBy','createdAt','updatedAt'] },
+  { key: 'pendingDeletes', tab: 'PendingDeletes', fields: ['id','refType','refId','label','requestedBy','requestedAt'] },
+  { key: 'config', tab: 'Config', fields: ['key','value'] }
+];
+
+async function ensureSheetTabs() {
+  const res = await sheets.spreadsheets.get({ spreadsheetId: GOOGLE_SHEET_ID });
+  const existing = (res.data.sheets || []).map(s => s.properties.title);
+  const needed = SHEET_TABS.map(t => t.tab).filter(t => !existing.includes(t));
+  if (!needed.length) return;
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId: GOOGLE_SHEET_ID,
+    requestBody: { requests: needed.map(title => ({ addSheet: { properties: { title } } })) }
+  });
+  // Write headers for new tabs
+  const headers = SHEET_TABS.map(t => ({ range: `${t.tab}!A1`, values: [t.fields] }));
+  await sheets.spreadsheets.values.batchUpdate({
+    spreadsheetId: GOOGLE_SHEET_ID,
+    requestBody: { valueInputOption: 'RAW', data: headers }
+  });
+}
+
+async function initSheets() {
+  if (!USE_SHEETS) return false;
+  try {
+    const auth = new google.auth.JWT(GOOGLE_SERVICE_EMAIL, null, GOOGLE_PRIVATE_KEY, ['https://www.googleapis.com/auth/spreadsheets']);
+    sheets = google.sheets({ version: 'v4', auth });
+    await ensureSheetTabs();
+    console.log('Google Sheets connected');
+    return true;
+  } catch (e) {
+    console.error('Sheets init failed:', e.message);
+    sheets = null;
+    return false;
+  }
+}
 
 function createFreshDB() {
   return {
     users: [{ id: '1101', username: '1101', password: '1101', name: 'Admin', role: 'Super Admin', roles: ['Super Admin','Support Desk','Workflow Coordinator','Upload Manager','Download Manager'], passChanged: false, createdBy: 'system' }],
-    tickets: [],
-    orders: [],
-    messages: [],
-    feedbacks: [],
-    pendingDeletes: [],
-    emailLogs: [],
+    tickets: [], orders: [], messages: [], feedbacks: [], pendingDeletes: [], emailLogs: [],
+    imapAccounts: [], slackConfig: { webhookUrl: '', enabled: false },
+    autoEmailConfig: { enabled: false, intervalMs: 120000 },
     nextId: { ticket: 100, order: 1000, feedback: 100, user: 100 }
   };
 }
 
-async function upstashGet(key) {
-  const url = `${process.env.UPSTASH_REDIS_REST_URL}/get/${key}`;
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${process.env.UPSTASH_REDIS_REST_TOKEN}` } });
-  const data = await res.json();
-  return data.result ? JSON.parse(data.result) : null;
-}
-
-async function upstashSet(key, value) {
-  const url = `${process.env.UPSTASH_REDIS_REST_URL}/set/${key}`;
-  await fetch(url, {
-    method: 'POST', headers: { Authorization: `Bearer ${process.env.UPSTASH_REDIS_REST_TOKEN}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(JSON.stringify(value))
-  });
-}
-
-const DB_KEY = 'cortex_db';
-const DATA_DIR = '/tmp/pixofix-cortex-data';
-const DB_FILE = path.join(DATA_DIR, 'db.json');
-
 async function db() {
-  if (USE_UPSTASH) {
-    let data = await upstashGet(DB_KEY);
-    if (!data) { data = createFreshDB(); await upstashSet(DB_KEY, data); }
-    return JSON.parse(JSON.stringify(data));
+  if (sheets) {
+    try {
+      const ranges = SHEET_TABS.map(t => `${t.tab}!A:ZZ`);
+      const res = await sheets.spreadsheets.values.batchGet({ spreadsheetId: GOOGLE_SHEET_ID, ranges, majorDimension: 'ROWS' });
+      const data = createFreshDB();
+      SHEET_TABS.forEach((cfg, i) => {
+        const rows = res.data.valueRanges[i]?.values || [];
+        if (rows.length < 2) return;
+        const h = rows[0];
+        data[cfg.key] = rows.slice(1).map(row => {
+          const obj = {};
+          cfg.fields.forEach((f, j) => { if (row[j] !== undefined) obj[f] = row[j]; });
+          if (f === 'roles' && typeof obj[f] === 'string') obj[f] = obj[f].split(',').map(s => s.trim());
+          return obj;
+        }).filter(x => x.id);
+      });
+      // Load config key-values
+      const cfgRows = res.data.valueRanges[SHEET_TABS.findIndex(t => t.key === 'config')]?.values || [];
+      cfgRows.slice(1).forEach(row => {
+        if (row[0] === 'nextId' && row[1]) try { data.nextId = JSON.parse(row[1]); } catch {}
+        if (row[0] === 'imapAccounts' && row[1]) try { data.imapAccounts = JSON.parse(row[1]); } catch {}
+        if (row[0] === 'autoEmailConfig' && row[1]) try { data.autoEmailConfig = JSON.parse(row[1]); } catch {}
+        if (row[0] === 'slackConfig' && row[1]) try { data.slackConfig = JSON.parse(row[1]); } catch {}
+      });
+      return JSON.parse(JSON.stringify(data));
+    } catch (e) { console.error('sheets read error:', e.message); }
   }
+  // Fallback: /tmp file
   try {
     if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-    if (!fs.existsSync(DB_FILE)) { const fresh = createFreshDB(); fs.writeFileSync(DB_FILE, JSON.stringify(fresh, null, 2)); return JSON.parse(JSON.stringify(fresh)); }
+    if (!fs.existsSync(DB_FILE)) { const f = createFreshDB(); fs.writeFileSync(DB_FILE, JSON.stringify(f, null, 2)); return JSON.parse(JSON.stringify(f)); }
     return JSON.parse(fs.readFileSync(DB_FILE, 'utf-8'));
   } catch { return createFreshDB(); }
 }
 
 async function dbSave(d) {
-  if (USE_UPSTASH) { await upstashSet(DB_KEY, d); return; }
+  if (sheets) {
+    try {
+      // Clear all tabs
+      await sheets.spreadsheets.values.batchClear({
+        spreadsheetId: GOOGLE_SHEET_ID,
+        requestBody: { ranges: SHEET_TABS.map(t => `${t.tab}!A:ZZ`) }
+      });
+      // Build data for each tab
+      const updates = SHEET_TABS.map(cfg => {
+        if (cfg.key === 'config') {
+          return {
+            range: `${cfg.tab}!A1`,
+            values: [
+              ['key', 'value'],
+              ['nextId', JSON.stringify(d.nextId || {})],
+              ['imapAccounts', JSON.stringify(d.imapAccounts || [])],
+              ['autoEmailConfig', JSON.stringify(d.autoEmailConfig || { enabled: false, intervalMs: 120000 })],
+              ['slackConfig', JSON.stringify(d.slackConfig || { webhookUrl: '', enabled: false })]
+            ]
+          };
+        }
+        const items = d[cfg.key] || [];
+        const rows = [cfg.fields];
+        items.forEach(item => {
+          rows.push(cfg.fields.map(f => {
+            if (f === 'roles' && Array.isArray(item[f])) return item[f].join(', ');
+            return item[f] !== undefined ? String(item[f]) : '';
+          }));
+        });
+        return { range: `${cfg.tab}!A1`, values: rows };
+      });
+      await sheets.spreadsheets.values.batchUpdate({
+        spreadsheetId: GOOGLE_SHEET_ID,
+        requestBody: { valueInputOption: 'RAW', data: updates }
+      });
+    } catch (e) { console.error('sheets write error:', e.message); }
+  }
+  // Fallback: /tmp file
   try { fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(DB_FILE, JSON.stringify(d, null, 2)); } catch {}
 }
 
@@ -398,25 +490,22 @@ function fetchMessages(imap, uids, emails, count, resolve, account) {
           count++;
           emails.push({ id: md.uid || count, subject, from: fromRaw, to: parsed.to?.text || '', date, text: bodyText.substring(0, 5000), seen: md.flags.includes('\\Seen') || false, account: account.label });
           try {
-            const raw = fs.existsSync(DB_FILE) ? fs.readFileSync(DB_FILE, 'utf-8') : null;
-            let data = raw ? JSON.parse(raw) : createFreshDB();
-            if (!(data.emailLogs || []).some(e => e.subject === subject && e.fromAddr === fromRaw)) {
-              if (!data.emailLogs) data.emailLogs = [];
-              const logId = uuidv4();
-              const now = new Date().toISOString();
-              const maskedFrom = maskEmail(fromRaw);
-              data.emailLogs.push({ id: logId, fromAddr: fromRaw, fromMasked: maskedFrom, subject, body: bodyText.substring(0, 2000), receivedAt: now, processedAs: '', account: account.label });
-              data.nextId = data.nextId || {};
-              const n = (data.nextId.ticket || 100) + 1;
-              data.nextId.ticket = n;
-              const ticketId = 'T' + n;
-              if (!data.tickets) data.tickets = [];
-              data.tickets.push({ id: ticketId, subject, client: maskedFrom, status: 'Open', priority: 'Medium', description: bodyText.substring(0, 2000), category: 'Email', agent: '', createdBy: 'system', createdAt: now, updatedAt: now, rtc: '', summary: '' });
-              const log = data.emailLogs.find(e => e.id === logId);
-              if (log) log.processedAs = ticketId;
-              fs.mkdirSync(DATA_DIR, { recursive: true });
-              fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
-            }
+            const data = await db();
+            if ((data.emailLogs || []).some(e => e.subject === subject && e.fromAddr === fromRaw)) continue;
+            if (!data.emailLogs) data.emailLogs = [];
+            const logId = uuidv4();
+            const now = new Date().toISOString();
+            const maskedFrom = maskEmail(fromRaw);
+            data.emailLogs.push({ id: logId, fromAddr: fromRaw, fromMasked: maskedFrom, subject, body: bodyText.substring(0, 2000), receivedAt: now, processedAs: '', account: account.label });
+            data.nextId = data.nextId || {};
+            const n = (data.nextId.ticket || 100) + 1;
+            data.nextId.ticket = n;
+            const ticketId = 'T' + n;
+            if (!data.tickets) data.tickets = [];
+            data.tickets.push({ id: ticketId, subject, client: maskedFrom, status: 'Open', priority: 'Medium', description: bodyText.substring(0, 2000), category: 'Email', agent: '', createdBy: 'system', createdAt: now, updatedAt: now, rtc: '', summary: '' });
+            const log = data.emailLogs.find(e => e.id === logId);
+            if (log) log.processedAs = ticketId;
+            await dbSave(data);
           } catch (e) {}
         } catch (e) {}
       }
@@ -504,6 +593,19 @@ app.post('/api/sync', async (req, res) => {
   res.json({ ok: true });
 });
 
+// ====== Sync endpoints for frontend ======
+app.get('/api/db', async (req, res) => {
+  const data = await db();
+  const safe = { ...data };
+  safe.users = (data.users || []).map(u => { const s = { ...u }; delete s.password; return s; });
+  res.json(safe);
+});
+
+app.post('/api/db', async (req, res) => {
+  await dbSave(req.body);
+  res.json({ ok: true });
+});
+
 // ====== Catch-all ======
 app.use((req, res, next) => {
   if (req.method === 'GET' && !req.path.startsWith('/api/')) {
@@ -518,11 +620,15 @@ app.use((err, req, res, next) => {
 });
 
 if (!IS_VERCEL) {
-  app.listen(PORT, '0.0.0.0', () => {
+  app.listen(PORT, '0.0.0.0', async () => {
     console.log(`Pixofix Cortex server running on port ${PORT}`);
     console.log(`Open http://localhost:${PORT} in your browser`);
+    await initSheets();
     restartAutoEmail();
   });
 }
+
+// Initialize sheets on Vercel cold start
+if (IS_VERCEL) initSheets();
 
 module.exports = app;
