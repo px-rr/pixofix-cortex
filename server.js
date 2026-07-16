@@ -23,13 +23,23 @@ app.use(express.static(path.join(__dirname, 'public')));
 // ====== Google Sheets Database ======
 const GOOGLE_SHEET_ID = process.env.GOOGLE_SHEET_ID;
 const GOOGLE_SERVICE_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-const GOOGLE_PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY ? process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n') : null;
+// Fix Vercel private key newline handling
+let GOOGLE_PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY || null;
+if (GOOGLE_PRIVATE_KEY) {
+  // Vercel may store as literal \n, or actual newlines, or double-encoded
+  GOOGLE_PRIVATE_KEY = GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n').replace(/\\r/g, '\r');
+  // Ensure it starts with BEGIN and ends with END
+  if (!GOOGLE_PRIVATE_KEY.includes('-----BEGIN')) {
+    console.error('WARNING: Private key missing BEGIN marker. First 40 chars:', GOOGLE_PRIVATE_KEY.substring(0, 40));
+  }
+}
 const USE_SHEETS = !!(GOOGLE_SHEET_ID && GOOGLE_SERVICE_EMAIL && GOOGLE_PRIVATE_KEY && google);
 
 const DATA_DIR = '/tmp/pixofix-cortex-data';
 const DB_FILE = path.join(DATA_DIR, 'db.json');
 
 let sheets = null;
+let sheetsLastError = null;
 
 const SHEET_TABS = [
   { key: 'emailLogs', tab: 'Emails', fields: ['id','fromAddr','fromMasked','subject','body','receivedAt','processedAs','account'] },
@@ -60,15 +70,20 @@ async function ensureSheetTabs() {
 }
 
 async function initSheets() {
-  if (!USE_SHEETS) return false;
+  if (!USE_SHEETS) { sheetsLastError = 'USE_SHEETS is false'; return false; }
   try {
     const auth = new google.auth.JWT(GOOGLE_SERVICE_EMAIL, null, GOOGLE_PRIVATE_KEY, ['https://www.googleapis.com/auth/spreadsheets']);
     sheets = google.sheets({ version: 'v4', auth });
+    // Test the connection first
+    await sheets.spreadsheets.get({ spreadsheetId: GOOGLE_SHEET_ID });
+    console.log('Google Sheets API accessible');
     await ensureSheetTabs();
     console.log('Google Sheets connected');
+    sheetsLastError = null;
     return true;
   } catch (e) {
-    console.error('Sheets init failed:', e.message);
+    console.error('Sheets init failed:', e.message, e.code || '');
+    sheetsLastError = e.message + ' (code: ' + (e.code || 'none') + ')';
     sheets = null;
     return false;
   }
@@ -595,7 +610,7 @@ app.post('/api/sync', async (req, res) => {
 
 // ====== Sync endpoints for frontend ======
 app.get('/api/status', async (req, res) => {
-  res.json({ sheetsActive: !!sheets, sheetId: GOOGLE_SHEET_ID || 'not set', serviceEmail: GOOGLE_SERVICE_EMAIL || 'not set', privateKeySet: !!GOOGLE_PRIVATE_KEY });
+  res.json({ sheetsActive: !!sheets, sheetId: GOOGLE_SHEET_ID || 'not set', serviceEmail: GOOGLE_SERVICE_EMAIL || 'not set', privateKeySet: !!GOOGLE_PRIVATE_KEY, lastError: sheetsLastError || 'none' });
 });
 
 app.get('/api/db', async (req, res) => {
