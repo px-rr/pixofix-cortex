@@ -610,7 +610,13 @@ app.post('/api/sync', async (req, res) => {
 
 // ====== Sync endpoints for frontend ======
 app.get('/api/status', async (req, res) => {
-  res.json({ sheetsActive: !!sheets, sheetId: GOOGLE_SHEET_ID || 'not set', serviceEmail: GOOGLE_SERVICE_EMAIL || 'not set', privateKeySet: !!GOOGLE_PRIVATE_KEY, lastError: sheetsLastError || 'none' });
+  const keyLen = GOOGLE_PRIVATE_KEY ? GOOGLE_PRIVATE_KEY.length : 0;
+  const keyStart = GOOGLE_PRIVATE_KEY ? GOOGLE_PRIVATE_KEY.substring(0, 30) : '';
+  const keyEnd = GOOGLE_PRIVATE_KEY ? GOOGLE_PRIVATE_KEY.substring(GOOGLE_PRIVATE_KEY.length - 30) : '';
+  const hasBegin = GOOGLE_PRIVATE_KEY ? GOOGLE_PRIVATE_KEY.includes('-----BEGIN') : false;
+  const hasEnd = GOOGLE_PRIVATE_KEY ? GOOGLE_PRIVATE_KEY.includes('-----END') : false;
+  const newlines = GOOGLE_PRIVATE_KEY ? (GOOGLE_PRIVATE_KEY.match(/\n/g) || []).length : 0;
+  res.json({ sheetsActive: !!sheets, sheetId: GOOGLE_SHEET_ID || 'not set', serviceEmail: GOOGLE_SERVICE_EMAIL || 'not set', privateKeySet: !!GOOGLE_PRIVATE_KEY, lastError: sheetsLastError || 'none', keyLen, keyStart, keyEnd, hasBegin, hasEnd, newlines, nodeVersion: process.version });
 });
 
 app.get('/api/db', async (req, res) => {
