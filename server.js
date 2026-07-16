@@ -594,6 +594,10 @@ app.post('/api/sync', async (req, res) => {
 });
 
 // ====== Sync endpoints for frontend ======
+app.get('/api/status', async (req, res) => {
+  res.json({ sheetsActive: !!sheets, sheetId: GOOGLE_SHEET_ID || 'not set', serviceEmail: GOOGLE_SERVICE_EMAIL || 'not set', privateKeySet: !!GOOGLE_PRIVATE_KEY });
+});
+
 app.get('/api/db', async (req, res) => {
   const data = await db();
   const safe = { ...data };
