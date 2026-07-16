@@ -27,7 +27,11 @@ const GOOGLE_SERVICE_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
 let GOOGLE_PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY || null;
 if (GOOGLE_PRIVATE_KEY) {
   // Vercel may store as literal \n, or actual newlines, or double-encoded
-  GOOGLE_PRIVATE_KEY = GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n').replace(/\\r/g, '\r');
+  GOOGLE_PRIVATE_KEY = GOOGLE_PRIVATE_KEY
+    .replace(/\\n/g, '\n')
+    .replace(/\\r/g, '\r')
+    .replace(/\r/g, '')  // Strip all CR chars
+    .trim();
   // Ensure it starts with BEGIN and ends with END
   if (!GOOGLE_PRIVATE_KEY.includes('-----BEGIN')) {
     console.error('WARNING: Private key missing BEGIN marker. First 40 chars:', GOOGLE_PRIVATE_KEY.substring(0, 40));
@@ -72,7 +76,15 @@ async function ensureSheetTabs() {
 async function initSheets() {
   if (!USE_SHEETS) { sheetsLastError = 'USE_SHEETS is false'; return false; }
   try {
-    const auth = new google.auth.JWT(GOOGLE_SERVICE_EMAIL, null, GOOGLE_PRIVATE_KEY, ['https://www.googleapis.com/auth/spreadsheets']);
+    // Use GoogleAuth with credentials object (avoids PEM parsing issues on Node 24)
+    const auth = new google.auth.GoogleAuth({
+      credentials: {
+        type: 'service_account',
+        client_email: GOOGLE_SERVICE_EMAIL,
+        private_key: GOOGLE_PRIVATE_KEY,
+      },
+      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+    });
     sheets = google.sheets({ version: 'v4', auth });
     // Test the connection first
     await sheets.spreadsheets.get({ spreadsheetId: GOOGLE_SHEET_ID });
