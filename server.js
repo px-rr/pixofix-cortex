@@ -23,18 +23,28 @@ app.use(express.static(path.join(__dirname, 'public')));
 // ====== Google Sheets Database ======
 const GOOGLE_SHEET_ID = process.env.GOOGLE_SHEET_ID;
 const GOOGLE_SERVICE_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-// Fix Vercel private key newline handling
+// Fix Vercel private key handling — may be truncated, raw PEM, or base64-encoded
 let GOOGLE_PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY || null;
 if (GOOGLE_PRIVATE_KEY) {
-  // Vercel may store as literal \n, or actual newlines, or double-encoded
+  // Check if it's base64-encoded (no BEGIN marker) and decode
+  if (!GOOGLE_PRIVATE_KEY.includes('-----BEGIN')) {
+    try {
+      GOOGLE_PRIVATE_KEY = Buffer.from(GOOGLE_PRIVATE_KEY, 'base64').toString('utf-8');
+      console.log('Decoded base64 private key');
+    } catch (e) {
+      console.error('Base64 decode failed, trying as raw PEM');
+    }
+  }
+  // Clean up: strip \r, fix escaped newlines
   GOOGLE_PRIVATE_KEY = GOOGLE_PRIVATE_KEY
     .replace(/\\n/g, '\n')
-    .replace(/\\r/g, '\r')
-    .replace(/\r/g, '')  // Strip all CR chars
+    .replace(/\r/g, '')
     .trim();
-  // Ensure it starts with BEGIN and ends with END
+  // Validate
   if (!GOOGLE_PRIVATE_KEY.includes('-----BEGIN')) {
-    console.error('WARNING: Private key missing BEGIN marker. First 40 chars:', GOOGLE_PRIVATE_KEY.substring(0, 40));
+    console.error('WARNING: Private key missing BEGIN marker. Length:', GOOGLE_PRIVATE_KEY.length);
+  } else {
+    console.log('Private key OK. Length:', GOOGLE_PRIVATE_KEY.length);
   }
 }
 const USE_SHEETS = !!(GOOGLE_SHEET_ID && GOOGLE_SERVICE_EMAIL && GOOGLE_PRIVATE_KEY && google);
